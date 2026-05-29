@@ -108,6 +108,7 @@ const ICONS = {
   copy:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`,
   wallet:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>`,
   bike:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>`,
+  book:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10M6 10h10"/></svg>`,
 };
 
 function icon(name, size = 20, color = 'currentColor') {
@@ -1742,6 +1743,12 @@ const CI_COMMUNES = [
   'Grand-Bassam', 'Aboisso', 'Adzopé', 'Agboville', 'Toumodi', 'Abengourou'
 ].sort();
 
+const DEMO_RECIPIENT_ADDRESSES = [
+  { id: 'addr-001', first_name: 'Aminata', last_name: 'Koné', email: 'aminata.kone@gmail.com', phone: '05 05 06 07 08', commune: 'Bouaké', quartier: 'Commerce', address: 'Maison Bleue, près de la CIE', repere: 'Face pharmacie principale' },
+  { id: 'addr-002', first_name: 'Ibrahim', last_name: 'Traoré', email: 'ibrahim.traore@outlook.com', phone: '07 08 09 10 11', commune: 'Abidjan Cocody', quartier: 'Angré', address: 'Résidence les Palmiers, Appt 4B', repere: 'Derrière le supermarché' },
+  { id: 'addr-003', first_name: 'Fatou', last_name: 'Coulibaly', email: 'fatou.couli@gmail.com', phone: '01 02 03 04 05', commune: 'San-Pédro', quartier: 'Bardot', address: 'Secteur 3, Rue des Pêcheurs', repere: 'Près de l\'école primaire' }
+];
+
 let createStep = 1;
 const createData = {};
 
@@ -1915,8 +1922,13 @@ function stepInformations() {
 
     <!-- Destinataire -->
     <div style="background:#F6F7F9;border-radius:16px;padding:16px">
-      <div style="font-size:16px;font-weight:800;color:#1A1A1A;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+      <div style="font-size:16px;font-weight:800;color:#1A1A1A;margin-bottom:14px;display:flex;align-items:center;width:100%;gap:8px">
         ${icon('user', 18, '#FF6C00')} Destinataire
+        ${isLogged ? `
+          <button type="button" onclick="openAddressBook()" style="margin-left:auto;display:flex;align-items:center;gap:6px;padding:6px 12px;background:#FF6C00;color:#fff;border:none;border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;box-shadow:0 2px 4px rgba(255,108,0,0.15)">
+            ${icon('book', 12, '#fff')} Carnet
+          </button>
+        ` : ''}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="form-group"><label class="form-label">Nom *</label>
@@ -2067,6 +2079,51 @@ function toggleOption(optKey) {
   createData[optKey] = !createData[optKey];
   const contentEl = document.getElementById('cs-content');
   if (contentEl) contentEl.innerHTML = stepInformations();
+}
+
+function openAddressBook() {
+  const content = `
+    <div style="display:flex;flex-direction:column;gap:12px;padding:8px 0 16px">
+      <div style="font-size:13px;color:#6B7280;margin-bottom:8px">Sélectionnez un destinataire enregistré pour pré-remplir le formulaire.</div>
+      ${DEMO_RECIPIENT_ADDRESSES.map((addr) => `
+        <div onclick="selectRecipientFromBook('${addr.id}')" style="background:#fff;border:1px solid #E6E6E6;border-radius:14px;padding:14px;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;gap:4px" onmouseover="this.style.borderColor='#FF6C00';this.style.background='#FFF3E8'" onmouseout="this.style.borderColor='#E6E6E6';this.style.background='#fff'">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:14px;font-weight:800;color:#1A1A1A">${addr.first_name} ${addr.last_name}</span>
+            <span class="badge badge-orange" style="font-size:9px;padding:2px 7px">${addr.commune}</span>
+          </div>
+          <div style="font-size:12px;color:#6B7280;display:flex;align-items:center;gap:4px">
+            ${icon('phone', 11, '#6B7280')} +225 ${addr.phone}
+          </div>
+          <div style="font-size:12px;color:#6B7280;display:flex;align-items:center;gap:4px">
+            ${icon('home', 11, '#6B7280')} ${addr.quartier}, ${addr.address}
+          </div>
+        </div>
+      `).join('')}
+      <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="Sheet.close()">Fermer</button>
+    </div>
+  `;
+  Sheet.open(content, "Sélectionner un destinataire");
+}
+
+function selectRecipientFromBook(addrId) {
+  const addr = DEMO_RECIPIENT_ADDRESSES.find(a => a.id === addrId);
+  if (!addr) return;
+  
+  createData.recipient_first_name = addr.first_name;
+  createData.recipient_last_name = addr.last_name;
+  createData.recipient_email = addr.email;
+  createData.recipient_phone = addr.phone;
+  createData.recipient_commune = addr.commune;
+  createData.recipient_quartier = addr.quartier;
+  createData.recipient_address = addr.address;
+  createData.recipient_repere = addr.repere;
+  
+  // Re-render Step 1 content to populate input fields
+  const contentEl = document.getElementById('cs-content');
+  if (contentEl) contentEl.innerHTML = stepInformations();
+  
+  Sheet.close();
+  Toast.show(`✓ ${addr.first_name} ${addr.last_name} sélectionné !`, 'success');
 }
 
 
