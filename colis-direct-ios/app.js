@@ -486,20 +486,7 @@ function renderHome() {
           </div>
         </div>
 
-        <!-- Mini stats -->
-        <div style="display:flex;gap:10px;margin-top:14px">
-          ${[
-            { val: activeShipments.length, label: 'Actifs', action: "Router.navigate('shipments')" },
-            { val: '+500', label: 'Relais', action: "Router.navigate('map')" },
-            { val: '24/7', label: 'Support', action: "openSupport()" },
-          ].map(s => `
-            <div onclick="${s.action}" style="flex:1;background:rgba(255,255,255,0.15);border-radius:12px;padding:11px 8px;text-align:center;cursor:pointer;backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.2);transition:background 0.15s" 
-              onmousedown="this.style.background='rgba(255,255,255,0.25)'" onmouseup="this.style.background='rgba(255,255,255,0.15)'">
-              <div style="font-size:20px;font-weight:800;color:#fff">${s.val}</div>
-              <div style="font-size:10px;color:rgba(255,255,255,0.78);margin-top:2px;font-weight:600">${s.label}</div>
-            </div>
-          `).join('')}
-        </div>
+
       </div>
     </div>
 
