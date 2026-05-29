@@ -1073,23 +1073,6 @@ function renderTrackingDetail(shipment) {
       </div>
     ` : ''}
 
-    <!-- Event log -->
-    <div class="divider-soft"></div>
-    <div style="padding:16px">
-      <div style="font-size:14px;font-weight:700;color:#1A1A1A;margin-bottom:12px">Historique</div>
-      ${(shipment.events || []).map((ev, i) => `
-        <div style="display:flex;gap:10px;padding:10px 0;${i < shipment.events.length - 1 ? 'border-bottom:1px solid #F6F7F9' : ''}">
-          <div style="width:34px;height:34px;border-radius:11px;background:${i===0?'#FF6C00':'#F6F7F9'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">
-            ${i === 0 ? icon('checkCircle', 15, 'white') : icon('clock', 15, '#9CA3AF')}
-          </div>
-          <div style="flex:1">
-            <div style="font-size:13px;font-weight:600;color:${i===0?'#FF6C00':'#1A1A1A'}">${getStatusLabel(ev.status)}</div>
-            ${ev.notes ? `<div style="font-size:12px;color:#6B7280;margin-top:2px;line-height:1.4">${ev.notes}</div>` : ''}
-            <div style="font-size:10px;color:#9CA3AF;margin-top:4px;font-family:monospace">${formatDateTime(ev.timestamp)}</div>
-          </div>
-        </div>
-      `).join('')}
-    </div>
 
     <!-- Actions -->
     <div style="padding:0 16px 28px;display:flex;flex-direction:column;gap:8px">
