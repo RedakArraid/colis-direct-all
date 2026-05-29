@@ -79,7 +79,6 @@ body {
 /* ── Screen Container ──────────────────────────────────────── */
 .screen {
   display: none;
-  flex-direction: column;
   height: calc(100vh - var(--safe-top));
   height: calc(100dvh - var(--safe-top));
   padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 24px);
@@ -89,7 +88,7 @@ body {
 }
 
 .screen.active {
-  display: flex;
+  display: block;
 }
 
 /* Special screens without bottom nav */
