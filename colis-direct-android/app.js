@@ -6,6 +6,55 @@
 
 'use strict';
 
+/* ── Inline Developer Console & Diagnostics ────────────────────── */
+(function() {
+  const logs = [];
+  window.addEventListener('error', function(e) {
+    const errorMsg = `[ERROR] ${e.message} at ${e.filename || 'app.js'}:${e.lineno || '?'}:${e.colno || '?'}`;
+    logs.push(errorMsg);
+    showDebugConsole();
+  });
+  window.addEventListener('unhandledrejection', function(e) {
+    const errorMsg = `[PROMISE REJECTION] ${e.reason}`;
+    logs.push(errorMsg);
+    showDebugConsole();
+  });
+  
+  window.logDebug = function(msg) {
+    logs.push(`[LOG] ${msg}`);
+    console.log(msg);
+  };
+
+  function showDebugConsole() {
+    let devBox = document.getElementById('debug-dev-box');
+    if (!devBox) {
+      devBox = document.createElement('div');
+      devBox.id = 'debug-dev-box';
+      devBox.style.cssText = 'position:fixed;top:10px;left:10px;right:10px;background:rgba(15,15,15,0.95);color:#FF6C00;padding:16px;z-index:999999;font-family:monospace;font-size:12px;white-space:pre-wrap;border-radius:12px;border:2px solid #FF6C00;box-shadow:0 10px 30px rgba(0,0,0,0.5);max-height:80vh;overflow-y:auto;';
+      document.body.appendChild(devBox);
+    }
+    devBox.innerHTML = `<h3 style="margin:0 0 8px;border-bottom:1px solid #FF6C00;padding-bottom:4px;display:flex;justify-content:space-between;align-items:center;"><span>Console de Diagnostic</span><button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:#fff;cursor:pointer;font-weight:bold;font-size:14px;">✕</button></h3>` + 
+      logs.map(l => {
+        const color = l.includes('ERROR') || l.includes('REJECTION') ? '#EF4444' : '#10B981';
+        return `<div style="color:${color};margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:4px;">${l}</div>`;
+      }).join('');
+  }
+  
+  // Invisible developer trigger: tap 3 times quickly in the top-left corner (x<50, y<50)
+  let taps = 0;
+  window.addEventListener('click', function(e) {
+    if (e.clientX < 50 && e.clientY < 50) {
+      taps++;
+      if (taps >= 3) {
+        taps = 0;
+        showDebugConsole();
+      }
+    } else {
+      taps = 0;
+    }
+  });
+})();
+
 /* ── Logo SVG (real logo.png integration — brand faithful) ──────── */
 const LOGO_SVG = `<img src="logo.png" alt="ColisDirect Logo" class="logo-img-main" />`;
 const LOGO_SMALL = `<img src="logo.png" alt="ColisDirect" class="logo-img-small" />`;
@@ -288,6 +337,7 @@ function formatDateTime(dateStr) {
 /* ── Router ────────────────────────────────────────────────────── */
 const Router = {
   navigate(screenId, options = {}) {
+    if (window.logDebug) window.logDebug("Router.navigate: " + screenId);
     // Track history
     if (!options.isBack && State.currentScreen !== screenId) {
       State.pushScreen(State.currentScreen);
@@ -298,8 +348,11 @@ const Router = {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     const target = document.getElementById(`screen-${screenId}`);
     if (target) {
+      if (window.logDebug) window.logDebug("Router.navigate: activating screen " + `screen-${screenId}`);
       target.classList.add('active');
       target.scrollTop = 0;
+    } else {
+      if (window.logDebug) window.logDebug("Router.navigate ERROR: " + `screen-${screenId}` + " not found in DOM");
     }
 
     // Nav visibility
@@ -342,7 +395,12 @@ const Router = {
       'cancel-shipment':   () => renderCancelShipment(options.shipment),
     };
     const fn = renders[screenId];
-    if (fn) fn();
+    if (fn) {
+      if (window.logDebug) window.logDebug("Router._render: rendering " + screenId);
+      fn();
+    } else {
+      if (window.logDebug) window.logDebug("Router._render ERROR: no renderer for " + screenId);
+    }
   }
 };
 
@@ -2395,83 +2453,102 @@ function renderAbout() {
 
 /* ── SETTINGS ──────────────────────────────────────────────────── */
 function renderSettings() {
+  if (window.logDebug) window.logDebug("renderSettings: starts...");
   const el = document.getElementById('screen-settings');
-  if (!el) return;
+  if (!el) {
+    if (window.logDebug) window.logDebug("renderSettings ERROR: #screen-settings element not found");
+    return;
+  }
 
-  el.innerHTML = `
-    <div class="app-header">
-      <button class="header-back" onclick="Router.back()">${icon('chevronLeft', 18)}</button>
-      <div class="header-title">Paramètres</div>
-    </div>
+  try {
+    if (window.logDebug) window.logDebug("renderSettings: generating and injecting HTML...");
+    el.innerHTML = `
+      <div class="app-header">
+        <button class="header-back" onclick="Router.back()">${icon('chevronLeft', 18)}</button>
+        <div class="header-title">Paramètres</div>
+      </div>
 
-    <div class="section-label">Notifications</div>
-    <div class="card" style="margin:0 16px 12px">
-      ${[
-        { id: 'notif-colis', label: 'Mises à jour colis', sub: 'Statut et alertes de livraison', on: true },
-        { id: 'notif-promo', label: 'Offres promotionnelles', sub: 'Réductions et codes promo', on: false },
-        { id: 'notif-news',  label: 'Actualités ColisDirect', sub: 'Nouveaux services et fonctionnalités', on: true },
-      ].map(item => `
-        <div class="list-item">
-          <div class="list-item-content">
-            <div class="list-item-title">${item.label}</div>
-            <div class="list-item-sub">${item.sub}</div>
+      <div class="section-label">Notifications</div>
+      <div class="card" style="margin:0 16px 12px">
+        ${[
+          { id: 'notif-colis', label: 'Mises à jour colis', sub: 'Statut et alertes de livraison', on: true },
+          { id: 'notif-promo', label: 'Offres promotionnelles', sub: 'Réductions et codes promo', on: false },
+          { id: 'notif-news',  label: 'Actualités ColisDirect', sub: 'Nouveaux services et fonctionnalités', on: true },
+        ].map(item => `
+          <div class="list-item">
+            <div class="list-item-content">
+              <div class="list-item-title">${item.label}</div>
+              <div class="list-item-sub">${item.sub}</div>
+            </div>
+            <button id="${item.id}" class="switch ${item.on ? 'on' : ''}" onclick="this.classList.toggle('on')">
+              <div class="switch-thumb"></div>
+            </button>
           </div>
-          <button id="${item.id}" class="switch ${item.on ? 'on' : ''}" onclick="this.classList.toggle('on')">
-            <div class="switch-thumb"></div>
-          </button>
+        `).join('')}
+      </div>
+
+      <div class="section-label">Apparence</div>
+      <div class="card" style="margin:0 16px 12px">
+        <div class="list-item" onclick="Toast.show('Thème sombre bientôt disponible', 'default')">
+          <div class="list-item-icon" style="background:#F6F7F9">${icon('settings', 18, '#6B7280')}</div>
+          <div class="list-item-content"><div class="list-item-title">Thème</div><div class="list-item-sub">Clair (par défaut)</div></div>
+          <span class="badge badge-gray">Clair</span>
         </div>
-      `).join('')}
-    </div>
+        <div class="list-item" onclick="Toast.show('Langue française sélectionnée', 'default')">
+          <div class="list-item-icon" style="background:#F6F7F9">${icon('globe', 18, '#6B7280')}</div>
+          <div class="list-item-content"><div class="list-item-title">Langue</div><div class="list-item-sub">Français</div></div>
+          <span class="badge badge-gray">FR</span>
+        </div>
+      </div>
 
-    <div class="section-label">Apparence</div>
-    <div class="card" style="margin:0 16px 12px">
-      <div class="list-item" onclick="Toast.show('Thème sombre bientôt disponible', 'default')">
-        <div class="list-item-icon" style="background:#F6F7F9">${icon('settings', 18, '#6B7280')}</div>
-        <div class="list-item-content"><div class="list-item-title">Thème</div><div class="list-item-sub">Clair (par défaut)</div></div>
-        <span class="badge badge-gray">Clair</span>
+      <div class="section-label">Sécurité</div>
+      <div class="card" style="margin:0 16px 12px">
+        <div class="list-item" onclick="showChangePwd()">
+          <div class="list-item-icon" style="background:#FFF3E8">${icon('lock', 18, '#FF6C00')}</div>
+          <div class="list-item-content"><div class="list-item-title">Changer le mot de passe</div></div>
+          ${icon('chevronRight', 16, '#D1D5DB')}
+        </div>
+        <div class="list-item" onclick="Toast.show('Identification biométrique activée', 'success')">
+          <div class="list-item-icon" style="background:#EEF4FF">${icon('shield', 18, '#2F6BE0')}</div>
+          <div class="list-item-content"><div class="list-item-title">Authentification biométrique</div><div class="list-item-sub">Face ID / Empreinte</div></div>
+          <button class="switch" onclick="this.classList.toggle('on');event.stopPropagation()"><div class="switch-thumb"></div></button>
+        </div>
       </div>
-      <div class="list-item" onclick="Toast.show('Langue française sélectionnée', 'default')">
-        <div class="list-item-icon" style="background:#F6F7F9">${icon('globe', 18, '#6B7280')}</div>
-        <div class="list-item-content"><div class="list-item-title">Langue</div><div class="list-item-sub">Français</div></div>
-        <span class="badge badge-gray">FR</span>
-      </div>
-    </div>
 
-    <div class="section-label">Sécurité</div>
-    <div class="card" style="margin:0 16px 12px">
-      <div class="list-item" onclick="showChangePwd()">
-        <div class="list-item-icon" style="background:#FFF3E8">${icon('lock', 18, '#FF6C00')}</div>
-        <div class="list-item-content"><div class="list-item-title">Changer le mot de passe</div></div>
-        ${icon('chevronRight', 16, '#D1D5DB')}
+      <div class="section-label">Données & Confidentialité</div>
+      <div class="card" style="margin:0 16px 12px">
+        <div class="list-item" onclick="clearCache()">
+          <div class="list-item-icon" style="background:#FEF8E7">${icon('download', 18, '#F5B400')}</div>
+          <div class="list-item-content"><div class="list-item-title">Vider le cache</div><div class="list-item-sub">Libérer de l'espace</div></div>
+          ${icon('chevronRight', 16, '#D1D5DB')}
+        </div>
+        <div class="list-item" onclick="deleteAccount()">
+          <div class="list-item-icon" style="background:#FEF2F2">${icon('xCircle', 18, '#DC2626')}</div>
+          <div class="list-item-content"><div class="list-item-title" style="color:#DC2626">Supprimer mon compte</div></div>
+          ${icon('chevronRight', 16, '#D1D5DB')}
+        </div>
       </div>
-      <div class="list-item" onclick="Toast.show('Identification biométrique activée', 'success')">
-        <div class="list-item-icon" style="background:#EEF4FF">${icon('shield', 18, '#2F6BE0')}</div>
-        <div class="list-item-content"><div class="list-item-title">Authentification biométrique</div><div class="list-item-sub">Face ID / Empreinte</div></div>
-        <button class="switch" onclick="this.classList.toggle('on');event.stopPropagation()"><div class="switch-thumb"></div></button>
-      </div>
-    </div>
 
-    <div class="section-label">Données & Confidentialité</div>
-    <div class="card" style="margin:0 16px 12px">
-      <div class="list-item" onclick="clearCache()">
-        <div class="list-item-icon" style="background:#FEF8E7">${icon('download', 18, '#F5B400')}</div>
-        <div class="list-item-content"><div class="list-item-title">Vider le cache</div><div class="list-item-sub">Libérer de l'espace</div></div>
-        ${icon('chevronRight', 16, '#D1D5DB')}
+      <div style="padding:16px 16px 32px;text-align:center;font-size:12px;color:#9CA3AF;line-height:1.7">
+        Version 2.0.0 (build 2026.05.29)<br/>
+        <button onclick="showTerms()" style="color:#FF6C00;font-weight:600;background:none;border:none;cursor:pointer;font-size:12px">CGU</button> · 
+        <button onclick="showTerms()" style="color:#FF6C00;font-weight:600;background:none;border:none;cursor:pointer;font-size:12px">Confidentialité</button> · 
+        <button onclick="Router.navigate('about')" style="color:#FF6C00;font-weight:600;background:none;border:none;cursor:pointer;font-size:12px">À propos</button>
       </div>
-      <div class="list-item" onclick="deleteAccount()">
-        <div class="list-item-icon" style="background:#FEF2F2">${icon('xCircle', 18, '#DC2626')}</div>
-        <div class="list-item-content"><div class="list-item-title" style="color:#DC2626">Supprimer mon compte</div></div>
-        ${icon('chevronRight', 16, '#D1D5DB')}
+    `;
+    if (window.logDebug) window.logDebug("renderSettings: HTML successfully generated and injected.");
+  } catch (error) {
+    el.innerHTML = `
+      <div style="padding: 24px; color: #DC2626; background: #fff; height: 100%; overflow-y: auto;">
+        <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 12px;">Erreur de rendu (Paramètres)</h3>
+        <p style="font-size: 14px; line-height: 1.5; color: #374151; margin-bottom: 16px;">
+          Une exception a été levée pendant la génération du contenu de cette page.
+        </p>
+        <pre style="font-family: monospace; font-size: 12px; background: #FEF2F2; padding: 16px; border-radius: 12px; border: 1px solid #FEE2E2; overflow-x: auto; white-space: pre-wrap;">${error.stack || error.message || error}</pre>
       </div>
-    </div>
-
-    <div style="padding:16px 16px 32px;text-align:center;font-size:12px;color:#9CA3AF;line-height:1.7">
-      Version 2.0.0 (build 2026.05.29)<br/>
-      <button onclick="showTerms()" style="color:#FF6C00;font-weight:600;background:none;border:none;cursor:pointer;font-size:12px">CGU</button> · 
-      <button onclick="showTerms()" style="color:#FF6C00;font-weight:600;background:none;border:none;cursor:pointer;font-size:12px">Confidentialité</button> · 
-      <button onclick="Router.navigate('about')" style="color:#FF6C00;font-weight:600;background:none;border:none;cursor:pointer;font-size:12px">À propos</button>
-    </div>
-  `;
+    `;
+    console.error("Settings render error:", error);
+  }
 }
 
 function showChangePwd() {
