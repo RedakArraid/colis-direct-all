@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   ColisDirect Android App — Main Application
+   ColisDirect iOS App — Main Application
    Version: 2.0.0 — Full audit & logo integration
    Architecture: Vanilla JS SPA with screen-based routing
 ═══════════════════════════════════════════════════════════════════ */
