@@ -159,7 +159,7 @@ const State = {
   },
 
   get unreadCount() {
-    return this.notifications.filter(n => n.unread).length;
+    return this.user ? this.notifications.filter(n => n.unread).length : 0;
   },
 
   pushScreen(screen) {
@@ -397,7 +397,7 @@ const Router = {
     const fn = renders[screenId];
     if (fn) {
       if (window.logDebug) window.logDebug("Router._render: rendering " + screenId);
-      fn();
+      fn(options);
     } else {
       if (window.logDebug) window.logDebug("Router._render ERROR: no renderer for " + screenId);
     }
@@ -450,9 +450,9 @@ function renderHome() {
   const el = document.getElementById('screen-home');
   if (!el) return;
 
-  const activeShipments = DEMO_SHIPMENTS.filter(s =>
+  const activeShipments = State.user ? DEMO_SHIPMENTS.filter(s =>
     !['PICKED_UP_BY_CUSTOMER','DELIVERED','DELIVERED_TO_CUSTOMER','CANCELLED','RETURN_TO_SENDER'].includes(s.current_status)
-  );
+  ) : [];
 
   el.innerHTML = `
     <!-- Header with real logo -->
@@ -610,11 +610,10 @@ function renderHome() {
         <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.85);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px">Rejoignez-nous</div>
         <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:8px">Devenez partenaire</div>
         <p style="font-size:13px;color:rgba(255,255,255,0.8);margin-bottom:16px;line-height:1.5">Livreur agréé ou point relais — développez votre activité avec ColisDirect.</p>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-sm" style="flex:1;font-size:12px;background:rgba(0,0,0,0.35);color:#fff;border:1.5px solid rgba(255,255,255,0.4);border-radius:12px" onclick="Router.navigate('partner')">
+          <button class="btn btn-sm" style="flex:1;font-size:12px;background:rgba(0,0,0,0.35);color:#fff;border:1.5px solid rgba(255,255,255,0.4);border-radius:12px" onclick="Router.navigate('partner', { partnerType: 'livreur' })">
             ${icon('bike', 14, 'white')} Livreur
           </button>
-          <button class="btn btn-sm" style="flex:1;font-size:12px;background:rgba(255,255,255,0.18);color:#fff;border:1.5px solid rgba(255,255,255,0.5);border-radius:12px" onclick="Router.navigate('partner')">
+          <button class="btn btn-sm" style="flex:1;font-size:12px;background:rgba(255,255,255,0.18);color:#fff;border:1.5px solid rgba(255,255,255,0.5);border-radius:12px" onclick="Router.navigate('partner', { partnerType: 'relais' })">
             ${icon('store', 14, 'white')} Point relais
           </button>
         </div>
@@ -1466,6 +1465,24 @@ function doLogout() {
 function renderNotifications() {
   const el = document.getElementById('screen-notifications');
   if (!el) return;
+
+  if (!State.user) {
+    el.innerHTML = `
+      <div class="app-header">
+        <button class="header-back" onclick="Router.back()">${icon('chevronLeft', 18)}</button>
+        <div class="header-title">Notifications</div>
+      </div>
+      <div class="empty-state" style="padding-top:60px">
+        <div style="margin-bottom:16px">${icon('bell', 36, '#FF6C00')}</div>
+        <div class="empty-title">Connectez-vous</div>
+        <div class="empty-sub">Connectez-vous pour voir vos alertes de livraison et vos offres exclusives.</div>
+        <button class="btn btn-primary" style="margin-top:20px;padding:14px 32px" onclick="Router.navigate('login')">
+          Se connecter
+        </button>
+      </div>
+    `;
+    return;
+  }
 
   el.innerHTML = `
     <div class="app-header">
@@ -2613,7 +2630,7 @@ function deleteAccount() {
 }
 
 /* ── PARTNER ───────────────────────────────────────────────────── */
-function renderPartner() {
+function renderPartner(options = {}) {
   const el = document.getElementById('screen-partner');
   if (!el) return;
 
@@ -2674,6 +2691,13 @@ function renderPartner() {
       </div>
     </div>
   `;
+
+  // If specific partner type was requested, open that form immediately
+  if (options && options.partnerType) {
+    setTimeout(() => {
+      showPartnerForm(options.partnerType);
+    }, 150);
+  }
 }
 
 function showPartnerForm(type) {
