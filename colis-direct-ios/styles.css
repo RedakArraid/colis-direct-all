@@ -1063,32 +1063,18 @@ h4 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 /* — Home Screen — */
 .home-hero {
-  background: linear-gradient(150deg, #FF6C00 0%, #FF8533 50%, #FF6C00 100%);
+  background: #ffffff;
   padding: 20px 16px 32px;
   position: relative;
   overflow: hidden;
 }
 
 .home-hero::before {
-  content: '';
-  position: absolute;
-  top: -40px;
-  right: -40px;
-  width: 180px;
-  height: 180px;
-  background: rgba(255,255,255,0.08);
-  border-radius: 50%;
+  display: none;
 }
 
 .home-hero::after {
-  content: '';
-  position: absolute;
-  bottom: -30px;
-  left: -30px;
-  width: 120px;
-  height: 120px;
-  background: rgba(255,255,255,0.06);
-  border-radius: 50%;
+  display: none;
 }
 
 .home-greeting {
@@ -1106,18 +1092,17 @@ h4 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 }
 
 .track-card {
-  background: rgba(255,255,255,0.15);
+  background: #f9fafb;
   border-radius: 16px;
   padding: 16px;
   margin-top: 18px;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.2);
+  border: 1px solid var(--cd-line);
 }
 
 .track-card-label {
   font-size: 12px;
   font-weight: 600;
-  color: rgba(255,255,255,0.8);
+  color: var(--cd-muted);
   margin-bottom: 10px;
 }
 
@@ -2219,47 +2204,32 @@ h4 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 /* ── Home Hero ─────────────────────────────────────────────── */
 .home-hero {
-  background: linear-gradient(135deg, var(--cd-orange) 0%, #FF8533 50%, #FF9A4D 100%);
+  background: #ffffff;
   padding: 20px 16px 28px;
   position: relative;
   overflow: hidden;
 }
 .home-hero::before {
-  content: '';
-  position: absolute;
-  top: -60px;
-  right: -60px;
-  width: 200px;
-  height: 200px;
-  background: rgba(255,255,255,0.08);
-  border-radius: 50%;
+  display: none;
 }
 .home-hero::after {
-  content: '';
-  position: absolute;
-  bottom: -40px;
-  left: -40px;
-  width: 150px;
-  height: 150px;
-  background: rgba(0,0,0,0.06);
-  border-radius: 50%;
+  display: none;
 }
 .home-greeting { font-size: 14px; color: #000000; font-weight: 500; }
 .home-name { font-size: 22px; font-weight: 900; color: #000000; letter-spacing: -0.5px; }
 
 /* ── Track Card (hero) ─────────────────────────────────────── */
 .track-card {
-  background: rgba(255,255,255,0.15);
+  background: #f9fafb;
   border-radius: 16px;
   padding: 14px;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.25);
+  border: 1px solid var(--cd-line);
   position: relative;
   z-index: 1;
 }
 .track-card-label {
   font-size: 12px;
-  color: rgba(255,255,255,0.85);
+  color: var(--cd-muted);
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -2271,10 +2241,10 @@ h4 { font-size: 14px; font-weight: 600; line-height: 1.4; }
   flex: 1;
   padding: 12px 14px;
   border-radius: 12px;
-  border: none;
+  border: 1px solid var(--cd-line);
   font-size: 14px;
   font-family: monospace;
-  background: rgba(255,255,255,0.95);
+  background: #ffffff;
   color: var(--cd-ink);
   outline: none;
   letter-spacing: 0.04em;
