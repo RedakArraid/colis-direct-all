@@ -1749,7 +1749,7 @@ function renderCreateShipment() {
   const el = document.getElementById('screen-create-shipment');
   if (!el) return;
 
-  const stepTitles = ['', 'Expéditeur', 'Destinataire', 'Colis & livraison', 'Récapitulatif'];
+  const stepTitles = ['', 'Informations', 'Livraison', 'Récapitulatif'];
 
   el.innerHTML = `
     <div class="app-header">
@@ -1762,21 +1762,25 @@ function renderCreateShipment() {
       </button>
     </div>
 
-    <!-- Stepper labels instead of dots -->
+    <!-- Stepper -->
     <div class="stepper-labels" style="display:flex;justify-content:space-between;padding:12px 16px 8px;border-bottom:1px solid #E6E6E6;background:#fff">
-      ${['Expéditeur', 'Destinataire', 'Colis', 'Récap'].map((lbl, idx) => {
+      ${['Informations', 'Livraison', 'Récap'].map((lbl, idx) => {
         const s = idx + 1;
         const active = s === createStep;
         const done = s < createStep;
         return `
-          <div style="display:flex;flex-direction:column;align-items:center;flex:1;position:relative">
-            <div style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;
-              background:${active || done ? '#FF6C00' : '#E6E6E6'};
-              color:${active || done ? '#fff' : '#6B7280'};
-              margin-bottom:4px;z-index:2">
-              ${done ? '✓' : s}
+          <div style="display:flex;align-items:center;flex:1">
+            <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0">
+              <div style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;
+                background:${active || done ? '#FF6C00' : '#fff'};
+                color:${active || done ? '#fff' : '#6B7280'};
+                border:2px solid ${active || done ? '#FF6C00' : '#E6E6E6'};
+                z-index:2">
+                ${done ? '✓' : s}
+              </div>
+              <div style="font-size:10px;font-weight:${active ? '700' : '500'};color:${active ? '#FF6C00' : done ? '#1A1A1A' : '#9CA3AF'};margin-top:4px;white-space:nowrap">${lbl}</div>
             </div>
-            <div style="font-size:10px;font-weight:${active ? '700' : '500'};color:${active ? '#FF6C00' : done ? '#1A1A1A' : '#9CA3AF'}">${lbl}</div>
+            ${idx < 2 ? `<div style="flex:1;height:2px;margin:0 8px 16px;background:${done ? '#FF6C00' : '#E6E6E6'}"></div>` : ''}
           </div>
         `;
       }).join('')}
@@ -1784,12 +1788,12 @@ function renderCreateShipment() {
 
     <!-- Content -->
     <div id="cs-content" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px">
-      ${createStep === 1 ? stepSender() : createStep === 2 ? stepRecipient() : createStep === 3 ? stepPackage() : stepSummary()}
+      ${createStep === 1 ? stepInformations() : createStep === 2 ? stepDeliveryMode() : stepSummary()}
     </div>
 
     <!-- Footer CTA -->
     <div style="padding:12px 16px;background:#fff;border-top:1px solid #E6E6E6;flex-shrink:0">
-      ${createStep < 4
+      ${createStep < 3
         ? `<button class="btn btn-primary btn-full" onclick="nextStep()">Continuer ${icon('arrowRight', 18)}</button>`
         : `<button class="btn btn-primary btn-full" onclick="submitShipment()">${icon('checkCircle', 18)} Confirmer l'envoi</button>`
       }
@@ -1797,65 +1801,243 @@ function renderCreateShipment() {
   `;
 }
 
-function stepSender() {
+function stepInformations() {
+  const isLogged = !!State.user;
+  
+  // Pre-fill sender data if logged in
+  if (isLogged) {
+    if (!createData.sender_first_name) createData.sender_first_name = State.user.first_name || '';
+    if (!createData.sender_last_name) createData.sender_last_name = State.user.last_name || '';
+    if (!createData.sender_email) createData.sender_email = State.user.email || '';
+    if (!createData.sender_phone && State.user.phone) {
+      createData.sender_phone = State.user.phone.replace('+225', '').trim();
+    }
+    if (!createData.sender_commune) createData.sender_commune = 'Abidjan Cocody';
+    if (!createData.sender_quartier) createData.sender_quartier = 'Angré';
+    if (!createData.sender_address) createData.sender_address = 'Rue des Jardins, Résidence Fleurs';
+    if (!createData.sender_repere) createData.sender_repere = 'Près du supermarché';
+  }
+
+  // Package state
+  const gridType = createData.grid_type || 'colis';
+  const size = createData.package_type || 'petit';
+  const weight = createData.weight || (gridType === 'courier' ? 0.5 : size === 'petit' ? 1 : size === 'moyen' ? 5 : 12);
+  const isFragile = createData.is_fragile || false;
+  const isInsured = createData.is_insured || false;
+
+  // Sender block
+  let senderBlock = '';
+  if (isLogged) {
+    senderBlock = `
+      <div style="background:#F6F7F9;border-radius:16px;padding:16px">
+        <div style="font-size:16px;font-weight:800;color:#1A1A1A;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+          ${icon('user', 18, '#FF6C00')} Expéditeur
+        </div>
+        <div style="background:#fff;border:1px solid #E6E6E6;border-radius:14px;padding:14px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px">
+            <span style="font-size:11px;color:#6B7280">🔒 Informations issues de votre profil</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div>
+              <div style="font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Nom</div>
+              <div style="font-size:13px;font-weight:600;color:#1A1A1A">${createData.sender_last_name || '<span style="color:#9CA3AF;font-style:italic">Non renseigné</span>'}</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Prénom</div>
+              <div style="font-size:13px;font-weight:600;color:#1A1A1A">${createData.sender_first_name || '<span style="color:#9CA3AF;font-style:italic">Non renseigné</span>'}</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Téléphone</div>
+              <div style="font-size:13px;font-weight:600;color:#1A1A1A">${createData.sender_phone || '<span style="color:#9CA3AF;font-style:italic">Non renseigné</span>'}</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Email</div>
+              <div style="font-size:13px;font-weight:600;color:#1A1A1A;overflow:hidden;text-overflow:ellipsis">${createData.sender_email || '<span style="color:#9CA3AF;font-style:italic">Non renseigné</span>'}</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Commune</div>
+              <div style="font-size:13px;font-weight:600;color:#1A1A1A">${createData.sender_commune || '<span style="color:#FF6C00;font-weight:700;font-size:11px">⚠ Requis</span>'}</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Quartier</div>
+              <div style="font-size:13px;font-weight:600;color:#1A1A1A">${createData.sender_quartier || '<span style="color:#FF6C00;font-weight:700;font-size:11px">⚠ Requis</span>'}</div>
+            </div>
+            <div style="grid-column:1/-1">
+              <div style="font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px;display:flex;align-items:center;gap:4px">${icon('home', 12, '#6B7280')} Adresse</div>
+              <div style="font-size:13px;font-weight:600;color:#1A1A1A">${createData.sender_address || '<span style="color:#FF6C00;font-weight:700;font-size:11px">⚠ Requis</span>'}</div>
+            </div>
+          </div>
+        </div>
+        <input type="hidden" id="s-fname" value="${createData.sender_first_name || ''}" />
+        <input type="hidden" id="s-lname" value="${createData.sender_last_name || ''}" />
+        <input type="hidden" id="s-email" value="${createData.sender_email || ''}" />
+        <input type="hidden" id="s-phone" value="${createData.sender_phone || ''}" />
+        <input type="hidden" id="s-commune" value="${createData.sender_commune || ''}" />
+        <input type="hidden" id="s-quartier" value="${createData.sender_quartier || ''}" />
+        <input type="hidden" id="s-address" value="${createData.sender_address || ''}" />
+        <input type="hidden" id="s-repere" value="${createData.sender_repere || ''}" />
+      </div>`;
+  } else {
+    senderBlock = `
+      <div style="background:#F6F7F9;border-radius:16px;padding:16px">
+        <div style="font-size:16px;font-weight:800;color:#1A1A1A;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+          ${icon('user', 18, '#FF6C00')} Expéditeur
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="form-group"><label class="form-label">Nom *</label>
+            <input class="form-input" id="s-lname" placeholder="Diallo" value="${createData.sender_last_name || ''}" /></div>
+          <div class="form-group"><label class="form-label">Prénom *</label>
+            <input class="form-input" id="s-fname" placeholder="Kader" value="${createData.sender_first_name || ''}" /></div>
+          <div class="form-group"><label class="form-label">Email</label>
+            <input class="form-input" id="s-email" placeholder="votre@email.com" value="${createData.sender_email || ''}" /></div>
+          <div class="form-group"><label class="form-label">Téléphone *</label>
+            <div style="display:flex;gap:6px">
+              <select class="form-select" style="width:80px;flex-shrink:0;padding:10px 6px;font-size:12px"><option>🇨🇮 +225</option></select>
+              <input class="form-input" id="s-phone" type="tel" placeholder="07 00 00 00 00" value="${createData.sender_phone || ''}" style="flex:1" />
+            </div></div>
+          <div class="form-group"><label class="form-label">Commune *</label>
+            <select class="form-select" id="s-commune">
+              <option value="">Choisir</option>
+              ${CI_COMMUNES.map(c => `<option value="${c}" ${createData.sender_commune === c ? 'selected' : ''}>${c}</option>`).join('')}
+            </select></div>
+          <div class="form-group"><label class="form-label">Quartier *</label>
+            <input class="form-input" id="s-quartier" placeholder="Angré, Zone 4..." value="${createData.sender_quartier || ''}" /></div>
+          <div class="form-group" style="grid-column:1/-1"><label class="form-label">Adresse précise *</label>
+            <input class="form-input" id="s-address" placeholder="Rue, bâtiment, étage…" value="${createData.sender_address || ''}" /></div>
+          <div class="form-group" style="grid-column:1/-1"><label class="form-label">Repère (optionnel)</label>
+            <input class="form-input" id="s-repere" placeholder="Près de la mosquée, en face de l'école..." value="${createData.sender_repere || ''}" /></div>
+        </div>
+      </div>`;
+  }
+
   return `
-    <div style="font-size:14px;font-weight:700;color:#FF6C00;margin-bottom:2px">Vos coordonnées</div>
-    <div class="form-group"><label class="form-label">Prénom *</label>
-      <input class="form-input" id="s-fname" placeholder="Kader" value="${createData.sender_first_name || (State.user?.first_name || '')}" /></div>
-    <div class="form-group"><label class="form-label">Nom *</label>
-      <input class="form-input" id="s-lname" placeholder="Diallo" value="${createData.sender_last_name || (State.user?.last_name || '')}" /></div>
-    <div class="form-group"><label class="form-label">Email</label>
-      <input class="form-input" id="s-email" placeholder="votre@email.com" value="${createData.sender_email || (State.user?.email || '')}" /></div>
-    <div class="form-group"><label class="form-label">Téléphone *</label>
-      <div style="display:flex;gap:8px">
-        <select class="form-select" style="width:96px;flex-shrink:0;padding:13px 8px;font-size:13px"><option>🇨🇮 +225</option></select>
-        <input class="form-input" id="s-phone" type="tel" placeholder="07 00 00 00 00" value="${createData.sender_phone || (State.user?.phone || '')}" style="flex:1" />
+    ${senderBlock}
+
+    <!-- Destinataire -->
+    <div style="background:#F6F7F9;border-radius:16px;padding:16px">
+      <div style="font-size:16px;font-weight:800;color:#1A1A1A;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+        ${icon('user', 18, '#FF6C00')} Destinataire
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group"><label class="form-label">Nom *</label>
+          <input class="form-input" id="r-lname" placeholder="Koné" value="${createData.recipient_last_name || ''}" /></div>
+        <div class="form-group"><label class="form-label">Prénom *</label>
+          <input class="form-input" id="r-fname" placeholder="Aminata" value="${createData.recipient_first_name || ''}" /></div>
+        <div class="form-group"><label class="form-label">Email</label>
+          <input class="form-input" id="r-email" placeholder="destinataire@email.com" value="${createData.recipient_email || ''}" /></div>
+        <div class="form-group"><label class="form-label">Téléphone *</label>
+          <div style="display:flex;gap:6px">
+            <select class="form-select" style="width:80px;flex-shrink:0;padding:10px 6px;font-size:12px"><option>🇨🇮 +225</option></select>
+            <input class="form-input" id="r-phone" type="tel" placeholder="05 00 00 00 00" value="${createData.recipient_phone || ''}" style="flex:1" />
+          </div></div>
+        <div class="form-group"><label class="form-label">Commune *</label>
+          <select class="form-select" id="r-commune">
+            <option value="">Choisir</option>
+            ${CI_COMMUNES.map(c => `<option value="${c}" ${createData.recipient_commune === c ? 'selected' : ''}>${c}</option>`).join('')}
+          </select></div>
+        <div class="form-group"><label class="form-label">Quartier *</label>
+          <input class="form-input" id="r-quartier" placeholder="Niangon, Cocody Centre..." value="${createData.recipient_quartier || ''}" /></div>
+        <div class="form-group" style="grid-column:1/-1"><label class="form-label">Adresse précise *</label>
+          <input class="form-input" id="r-address" placeholder="Rue, bâtiment, étage…" value="${createData.recipient_address || ''}" /></div>
+        <div class="form-group" style="grid-column:1/-1"><label class="form-label">Repère (optionnel)</label>
+          <input class="form-input" id="r-repere" placeholder="À côté du marché, près de la pharmacie..." value="${createData.recipient_repere || ''}" /></div>
       </div>
     </div>
-    <div class="form-group"><label class="form-label">Commune de départ *</label>
-      <select class="form-select" id="s-commune">
-        <option value="">Choisir une commune</option>
-        ${CI_COMMUNES.map(c => `<option value="${c}" ${createData.sender_commune === c ? 'selected' : ''}>${c}</option>`).join('')}
-      </select>
+
+    <!-- Informations du colis -->
+    <div style="background:#F6F7F9;border-radius:16px;padding:16px">
+      <div style="font-size:16px;font-weight:800;color:#1A1A1A;margin-bottom:14px">Informations du colis</div>
+
+      <!-- Type d'envoi -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:13px;font-weight:700;color:#3A3A3A;margin-bottom:8px">Type d'envoi <span style="color:red">*</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          ${[
+            { id: 'courier', emoji: '✉️', label: 'Courrier', desc: 'Documents, enveloppes' },
+            { id: 'colis',   emoji: '📦', label: 'Colis',    desc: 'Objets, marchandises' },
+          ].map(t => `
+            <div onclick="updateGridType('${t.id}')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px 8px;border:2px solid ${gridType===t.id?'#FF6C00':'#E6E6E6'};background:${gridType===t.id?'#FFF3E8':'#fff'};border-radius:14px;cursor:pointer;transition:all .2s">
+              <div style="font-size:28px;margin-bottom:4px">${t.emoji}</div>
+              <div style="font-size:13px;font-weight:700;color:${gridType===t.id?'#FF6C00':'#3A3A3A'};margin-bottom:2px">${t.label}</div>
+              <div style="font-size:10px;color:#6B7280;text-align:center">${t.desc}</div>
+              ${gridType===t.id ? `<div style="margin-top:6px;width:22px;height:22px;background:#FF6C00;border-radius:50%;display:flex;align-items:center;justify-content:center">${icon('checkCircle', 14, '#fff')}</div>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Taille + Poids -->
+      <div style="display:grid;grid-template-columns:${gridType === 'colis' ? '1fr 1fr' : '1fr'};gap:10px;margin-bottom:14px">
+        ${gridType === 'colis' ? `
+          <div class="form-group"><label class="form-label">Taille du colis *</label>
+            <select class="form-select" id="c-size" onchange="createData.package_type=this.value;createData.weight=this.value==='petit'?1:this.value==='moyen'?5:12;document.getElementById('c-weight').value=createData.weight">
+              <option value="petit" ${size==='petit'?'selected':''}>Petit (≤ 2 kg)</option>
+              <option value="moyen" ${size==='moyen'?'selected':''}>Moyen (2–10 kg)</option>
+              <option value="grand" ${size==='grand'?'selected':''}>Grand (> 10 kg)</option>
+            </select></div>
+        ` : ''}
+        <div class="form-group"><label class="form-label">Poids (kg) *</label>
+          <input class="form-input" id="c-weight" type="number" step="0.1" min="0.1" value="${weight}" onchange="createData.weight=parseFloat(this.value)" /></div>
+      </div>
+
+      <!-- Options (colis only) -->
+      ${gridType === 'colis' ? `
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#3A3A3A;margin-bottom:8px">Options supplémentaires</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            ${[
+              { key: 'is_fragile', active: isFragile, emoji: '⚠️', label: 'Colis fragile', price: '+500 FCFA' },
+              { key: 'is_insured', active: isInsured, emoji: '🛡️', label: 'Assurer', price: '+500 FCFA' },
+            ].map(opt => `
+              <div onclick="toggleOption('${opt.key}')" style="display:flex;flex-direction:column;align-items:center;padding:12px 8px;border:2px solid ${opt.active?'#FF6C00':'#E6E6E6'};background:${opt.active?'#FFF3E8':'#fff'};border-radius:14px;cursor:pointer;transition:all .2s">
+                <div style="font-size:24px;margin-bottom:4px">${opt.emoji}</div>
+                <div style="font-size:12px;font-weight:700;color:${opt.active?'#FF6C00':'#3A3A3A'};margin-bottom:2px">${opt.label}</div>
+                <div style="font-size:10px;color:#6B7280">${opt.price}</div>
+                ${opt.active ? `<div style="margin-top:4px;width:20px;height:20px;background:#FF6C00;border-radius:50%;display:flex;align-items:center;justify-content:center">${icon('closeX', 12, '#fff')}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
     </div>
-    <div class="form-group"><label class="form-label">Quartier *</label>
-      <input class="form-input" id="s-quartier" placeholder="Ex: Angré, Zone 4..." value="${createData.sender_quartier || ''}" /></div>
-    <div class="form-group"><label class="form-label">Description précise de l'adresse *</label>
-      <input class="form-input" id="s-address" placeholder="Rue, bâtiment, étage…" value="${createData.sender_address || ''}" /></div>
-    <div class="form-group"><label class="form-label">Repère (optionnel)</label>
-      <input class="form-input" id="s-repere" placeholder="Ex: Près de la mosquée, en face de l'école..." value="${createData.sender_repere || ''}" /></div>
-    <div class="notice-banner notice-blue">${icon('info', 14)} Ces informations seront imprimées sur le bordereau d'expédition.</div>
   `;
 }
 
-function stepRecipient() {
+function stepDeliveryMode() {
+  const pickup = createData.pickup_method || 'relay_deposit';
+  const delivery = createData.home_delivery ? 'home' : 'relay';
+
   return `
-    <div style="font-size:14px;font-weight:700;color:#FF6C00;margin-bottom:2px">Informations du destinataire</div>
-    <div class="form-group"><label class="form-label">Prénom *</label>
-      <input class="form-input" id="r-fname" placeholder="Aminata" value="${createData.recipient_first_name || ''}" /></div>
-    <div class="form-group"><label class="form-label">Nom *</label>
-      <input class="form-input" id="r-lname" placeholder="Koné" value="${createData.recipient_last_name || ''}" /></div>
-    <div class="form-group"><label class="form-label">Email</label>
-      <input class="form-input" id="r-email" placeholder="destinataire@email.com" value="${createData.recipient_email || ''}" /></div>
-    <div class="form-group"><label class="form-label">Téléphone *</label>
-      <div style="display:flex;gap:8px">
-        <select class="form-select" style="width:96px;flex-shrink:0;padding:13px 8px;font-size:13px"><option>🇨🇮 +225</option></select>
-        <input class="form-input" id="r-phone" type="tel" placeholder="05 00 00 00 00" value="${createData.recipient_phone || ''}" style="flex:1" />
-      </div>
+    <div style="background:#F6F7F9;border-radius:16px;padding:16px">
+      <div style="font-size:16px;font-weight:800;color:#1A1A1A;margin-bottom:14px">Mode de collecte</div>
+      ${[
+        { id: 'relay_deposit', label: 'Dépôt en point relais', sub: 'Déposez votre colis dans un relais partenaire', icon: 'store', bg: '#FFF3E8', color: '#FF6C00' },
+        { id: 'home_pickup',   label: 'Ramassage à domicile',  sub: 'Un livreur vient récupérer chez vous (+500 F)', icon: 'home',  bg: '#EEF4FF', color: '#2F6BE0' },
+      ].map(m => `
+        <div class="delivery-mode-card ${pickup === m.id ? 'selected' : ''}" onclick="createData.pickup_method='${m.id}';document.getElementById('cs-content').innerHTML=stepDeliveryMode()">
+          <div class="delivery-mode-icon" style="background:${pickup===m.id?'#FF6C00':m.bg}">${icon(m.icon, 20, pickup===m.id?'white':m.color)}</div>
+          <div style="flex:1"><div style="font-size:14px;font-weight:700;color:#1A1A1A">${m.label}</div><div style="font-size:12px;color:#6B7280;margin-top:2px">${m.sub}</div></div>
+        </div>
+      `).join('')}
     </div>
-    <div class="form-group"><label class="form-label">Commune d'arrivée *</label>
-      <select class="form-select" id="r-commune">
-        <option value="">Choisir une commune</option>
-        ${CI_COMMUNES.map(c => `<option value="${c}" ${createData.recipient_commune === c ? 'selected' : ''}>${c}</option>`).join('')}
-      </select>
+
+    <div style="background:#F6F7F9;border-radius:16px;padding:16px">
+      <div style="font-size:16px;font-weight:800;color:#1A1A1A;margin-bottom:14px">Mode de livraison</div>
+      ${[
+        { id: 'relay', label: 'Livraison en point relais', sub: 'Le destinataire retire dans un relais partenaire', icon: 'store', bg: '#FFF3E8', color: '#FF6C00' },
+        { id: 'home',  label: 'Livraison à domicile',      sub: 'Livraison directement chez le destinataire (+500 F)', icon: 'home', bg: '#EEF4FF', color: '#2F6BE0' },
+      ].map(m => `
+        <div class="delivery-mode-card ${delivery === m.id ? 'selected' : ''}" onclick="createData.home_delivery=${m.id==='home'};document.getElementById('cs-content').innerHTML=stepDeliveryMode()">
+          <div class="delivery-mode-icon" style="background:${delivery===m.id?'#FF6C00':m.bg}">${icon(m.icon, 20, delivery===m.id?'white':m.color)}</div>
+          <div style="flex:1"><div style="font-size:14px;font-weight:700;color:#1A1A1A">${m.label}</div><div style="font-size:12px;color:#6B7280;margin-top:2px">${m.sub}</div></div>
+        </div>
+      `).join('')}
     </div>
-    <div class="form-group"><label class="form-label">Quartier *</label>
-      <input class="form-input" id="r-quartier" placeholder="Ex: Niangon, Cocody Centre..." value="${createData.recipient_quartier || ''}" /></div>
-    <div class="form-group"><label class="form-label">Description précise de l'adresse *</label>
-      <input class="form-input" id="r-address" placeholder="Rue, bâtiment, étage…" value="${createData.recipient_address || ''}" /></div>
-    <div class="form-group"><label class="form-label">Repère (optionnel)</label>
-      <input class="form-input" id="r-repere" placeholder="Ex: À côté du marché, près de la pharmacie..." value="${createData.recipient_repere || ''}" /></div>
-    <div class="notice-banner notice-orange">${icon('alertTriangle', 14)} Le destinataire recevra un SMS dès que son colis sera disponible.</div>
+
+    <div class="form-group">
+      <label class="form-label">Description du contenu</label>
+      <textarea class="form-input" id="c-desc" rows="2" style="resize:none" placeholder="Ex: vêtements, documents, appareils…">${createData.description || ''}</textarea>
+    </div>
   `;
 }
 
@@ -1867,117 +2049,27 @@ function updateGridType(type) {
     createData.is_fragile = false;
     createData.is_insured = false;
   } else {
-    createData.package_type = 'moyen';
-    createData.weight = 5;
+    createData.package_type = 'petit';
+    createData.weight = 1;
   }
   const contentEl = document.getElementById('cs-content');
-  if (contentEl) contentEl.innerHTML = stepPackage();
+  if (contentEl) contentEl.innerHTML = stepInformations();
 }
 
 function updatePackageSize(size) {
   createData.package_type = size;
-  createData.weight = size === 'petit' ? 1.5 : size === 'moyen' ? 5 : 12;
+  createData.weight = size === 'petit' ? 1 : size === 'moyen' ? 5 : 12;
   const contentEl = document.getElementById('cs-content');
-  if (contentEl) contentEl.innerHTML = stepPackage();
+  if (contentEl) contentEl.innerHTML = stepInformations();
 }
 
 function toggleOption(optKey) {
   createData[optKey] = !createData[optKey];
   const contentEl = document.getElementById('cs-content');
-  if (contentEl) contentEl.innerHTML = stepPackage();
+  if (contentEl) contentEl.innerHTML = stepInformations();
 }
 
-function stepPackage() {
-  const gridType = createData.grid_type || 'colis';
-  const size = createData.package_type || 'moyen';
-  const weight = createData.weight || (gridType === 'courier' ? 0.5 : size === 'petit' ? 1.5 : size === 'moyen' ? 5 : 12);
-  const pickup = createData.pickup_method || 'relay_deposit';
-  const delivery = createData.home_delivery ? 'home' : 'relay';
-  const isFragile = createData.is_fragile || false;
-  const isInsured = createData.is_insured || false;
 
-  return `
-    <div style="font-size:14px;font-weight:700;color:#FF6C00;margin-bottom:2px">Type d'envoi</div>
-    <div style="display:flex;gap:12px;margin-bottom:8px">
-      <div class="grid-type-option ${gridType === 'courier' ? 'selected' : ''}" style="flex:1;border:2px solid ${gridType==='courier'?'#FF6C00':'#E6E6E6'};background:${gridType==='courier'?'#FFF3E8':'#fff'};border-radius:14px;padding:12px;text-align:center;cursor:pointer" onclick="updateGridType('courier')">
-        <div style="font-size:22px">✉️</div>
-        <div style="font-size:13px;font-weight:700;color:#1A1A1A;margin-top:4px">Courrier</div>
-        <div style="font-size:10px;color:#6B7280;margin-top:2px">Documents, enveloppes</div>
-      </div>
-      <div class="grid-type-option ${gridType === 'colis' ? 'selected' : ''}" style="flex:1;border:2px solid ${gridType==='colis'?'#FF6C00':'#E6E6E6'};background:${gridType==='colis'?'#FFF3E8':'#fff'};border-radius:14px;padding:12px;text-align:center;cursor:pointer" onclick="updateGridType('colis')">
-        <div style="font-size:22px">📦</div>
-        <div style="font-size:13px;font-weight:700;color:#1A1A1A;margin-top:4px">Colis</div>
-        <div style="font-size:10px;color:#6B7280;margin-top:2px">Objets, marchandises</div>
-      </div>
-    </div>
-
-    ${gridType === 'colis' ? `
-      <div style="font-size:14px;font-weight:700;color:#FF6C00;margin-bottom:2px">Taille du colis</div>
-      <div class="size-grid">
-        ${[
-          { id: 'petit',  label: 'Petit',  icon: '📦', sub: '< 3 kg',   price: '1 000 F' },
-          { id: 'moyen',  label: 'Moyen',  icon: '🗃️', sub: '3–10 kg',  price: '1 500 F' },
-          { id: 'grand',  label: 'Grand',  icon: '📫', sub: '> 10 kg',  price: '2 000 F' },
-        ].map(s => `
-          <div class="size-option ${size === s.id ? 'selected' : ''}" onclick="updatePackageSize('${s.id}')">
-            <div class="size-icon">${s.icon}</div>
-            <div class="size-name">${s.label}</div>
-            <div class="size-price">${s.sub}</div>
-            <div style="font-size:12px;font-weight:800;color:${size===s.id?'#FF6C00':'#16A34A'};margin-top:4px">${s.price}</div>
-          </div>
-        `).join('')}
-      </div>
-    ` : ''}
-
-    <div class="form-group" style="margin-top:4px">
-      <label class="form-label">Poids estimé (kg) *</label>
-      <input class="form-input" id="c-weight" type="number" step="0.1" min="0.1" value="${weight}" onchange="createData.weight = parseFloat(this.value)" />
-    </div>
-
-    ${gridType === 'colis' ? `
-      <div style="font-size:14px;font-weight:700;color:#FF6C00;margin-top:4px;margin-bottom:6px">Options supplémentaires</div>
-      <div style="display:flex;gap:12px;margin-bottom:8px">
-        <div class="option-card ${isFragile ? 'selected' : ''}" style="flex:1;border:2px solid ${isFragile?'#FF6C00':'#E6E6E6'};background:${isFragile?'#FFF3E8':'#fff'};border-radius:14px;padding:12px;text-align:center;cursor:pointer" onclick="toggleOption('is_fragile')">
-          <div style="font-size:20px">⚠️</div>
-          <div style="font-size:13px;font-weight:700;color:#1A1A1A;margin-top:4px">Colis fragile</div>
-          <div style="font-size:11px;font-weight:800;color:#FF6C00;margin-top:2px">+500 F</div>
-        </div>
-        <div class="option-card ${isInsured ? 'selected' : ''}" style="flex:1;border:2px solid ${isInsured?'#FF6C00':'#E6E6E6'};background:${isInsured?'#FFF3E8':'#fff'};border-radius:14px;padding:12px;text-align:center;cursor:pointer" onclick="toggleOption('is_insured')">
-          <div style="font-size:20px">🛡️</div>
-          <div style="font-size:13px;font-weight:700;color:#1A1A1A;margin-top:4px">Assurance</div>
-          <div style="font-size:11px;font-weight:800;color:#FF6C00;margin-top:2px">+500 F</div>
-        </div>
-      </div>
-    ` : ''}
-
-    <div style="font-size:14px;font-weight:700;color:#FF6C00;margin-top:4px;margin-bottom:2px">Mode de collecte</div>
-    ${[
-      { id: 'relay_deposit', label: 'Dépôt en point relais', sub: 'Déposez votre colis dans un relais partenaire', icon: 'store', bg: '#FFF3E8', color: '#FF6C00' },
-      { id: 'home_pickup',   label: 'Ramassage à domicile',  sub: 'Un livreur vient récupérer chez vous (+500 F)', icon: 'home',  bg: '#EEF4FF', color: '#2F6BE0' },
-    ].map(m => `
-      <div class="delivery-mode-card ${pickup === m.id ? 'selected' : ''}" onclick="createData.pickup_method='${m.id}';document.getElementById('cs-content').innerHTML=stepPackage()">
-        <div class="delivery-mode-icon" style="background:${pickup===m.id?'#FF6C00':m.bg}">${icon(m.icon, 20, pickup===m.id?'white':m.color)}</div>
-        <div style="flex:1"><div style="font-size:14px;font-weight:700;color:#1A1A1A">${m.label}</div><div style="font-size:12px;color:#6B7280;margin-top:2px">${m.sub}</div></div>
-      </div>
-    `).join('')}
-
-    <div style="font-size:14px;font-weight:700;color:#FF6C00;margin-top:4px;margin-bottom:2px">Mode de livraison</div>
-    ${[
-      { id: 'relay', label: 'Livraison en point relais', sub: 'Le destinataire retire dans un relais partenaire', icon: 'store', bg: '#FFF3E8', color: '#FF6C00' },
-      { id: 'home',  label: 'Livraison à domicile',      sub: 'Livraison directement chez le destinataire (+500 F)', icon: 'home', bg: '#EEF4FF', color: '#2F6BE0' },
-    ].map(m => `
-      <div class="delivery-mode-card ${delivery === m.id ? 'selected' : ''}" onclick="createData.home_delivery=${m.id==='home'};document.getElementById('cs-content').innerHTML=stepPackage()">
-        <div class="delivery-mode-icon" style="background:${delivery===m.id?'#FF6C00':m.bg}">${icon(m.icon, 20, delivery===m.id?'white':m.color)}</div>
-        <div style="flex:1"><div style="font-size:14px;font-weight:700;color:#1A1A1A">${m.label}</div><div style="font-size:12px;color:#6B7280;margin-top:2px">${m.sub}</div></div>
-      </div>
-    `).join('')}
-
-    <div class="form-group">
-      <label class="form-label">Description du contenu</label>
-      <textarea class="form-input" id="c-desc" rows="2" style="resize:none" placeholder="Ex: vêtements, documents, appareils…">${createData.description || ''}</textarea>
-    </div>
-  `;
-}
 
 function stepSummary() {
   const isIntra = createData.sender_commune === createData.recipient_commune;
@@ -2073,6 +2165,7 @@ function stepSummary() {
 
 function nextStep() {
   if (createStep === 1) {
+    // Collect sender data
     createData.sender_first_name = document.getElementById('s-fname')?.value?.trim();
     createData.sender_last_name = document.getElementById('s-lname')?.value?.trim();
     createData.sender_email = document.getElementById('s-email')?.value?.trim();
@@ -2082,10 +2175,7 @@ function nextStep() {
     createData.sender_address = document.getElementById('s-address')?.value?.trim();
     createData.sender_repere = document.getElementById('s-repere')?.value?.trim();
     
-    if (!createData.sender_first_name || !createData.sender_last_name || !createData.sender_phone || !createData.sender_commune || !createData.sender_quartier || !createData.sender_address) {
-      Toast.show('Remplissez tous les champs obligatoires (*)', 'warning'); return;
-    }
-  } else if (createStep === 2) {
+    // Collect recipient data
     createData.recipient_first_name = document.getElementById('r-fname')?.value?.trim();
     createData.recipient_last_name = document.getElementById('r-lname')?.value?.trim();
     createData.recipient_email = document.getElementById('r-email')?.value?.trim();
@@ -2095,16 +2185,20 @@ function nextStep() {
     createData.recipient_address = document.getElementById('r-address')?.value?.trim();
     createData.recipient_repere = document.getElementById('r-repere')?.value?.trim();
     
-    if (!createData.recipient_first_name || !createData.recipient_last_name || !createData.recipient_phone || !createData.recipient_commune || !createData.recipient_quartier || !createData.recipient_address) {
-      Toast.show('Remplissez tous les champs obligatoires (*)', 'warning'); return;
-    }
-  } else if (createStep === 3) {
-    createData.description = document.getElementById('c-desc')?.value?.trim();
+    // Collect package data (also on Step 1 now)
     const weightVal = parseFloat(document.getElementById('c-weight')?.value);
     if (!isNaN(weightVal)) createData.weight = weightVal;
-    
     if (!createData.grid_type) createData.grid_type = 'colis';
-    if (!createData.package_type) createData.package_type = 'moyen';
+    if (!createData.package_type) createData.package_type = 'petit';
+    
+    // Validate required fields
+    if (!createData.sender_first_name || !createData.sender_last_name || !createData.sender_phone || !createData.sender_commune || !createData.sender_quartier || !createData.sender_address ||
+        !createData.recipient_first_name || !createData.recipient_last_name || !createData.recipient_phone || !createData.recipient_commune || !createData.recipient_quartier || !createData.recipient_address) {
+      Toast.show('Remplissez tous les champs obligatoires (*)', 'warning'); return;
+    }
+  } else if (createStep === 2) {
+    // Collect delivery mode data
+    createData.description = document.getElementById('c-desc')?.value?.trim();
     if (!createData.pickup_method) createData.pickup_method = 'relay_deposit';
     if (createData.home_delivery === undefined) createData.home_delivery = false;
     if (createData.is_fragile === undefined) createData.is_fragile = false;

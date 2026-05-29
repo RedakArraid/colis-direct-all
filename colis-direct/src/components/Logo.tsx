@@ -8,10 +8,10 @@ interface LogoProps {
 }
 
 const sizeClasses = {
-  sm: 'h-10 sm:h-16 w-auto',
-  md: 'h-12 sm:h-20 w-auto',
-  lg: 'h-16 sm:h-28 w-auto',
-  xl: 'h-24 sm:h-40 w-auto',
+  sm: 'h-10 sm:h-16 w-auto max-w-[120px] sm:max-w-[160px]',
+  md: 'h-12 sm:h-20 w-auto max-w-[150px] sm:max-w-[200px]',
+  lg: 'h-16 sm:h-28 w-auto max-w-[200px] sm:max-w-[280px]',
+  xl: 'h-24 sm:h-40 w-auto max-w-[250px] sm:max-w-[360px]',
 };
 
 export default function Logo({ showText: _showText = false, size = 'md', className = '', onClick }: LogoProps) {

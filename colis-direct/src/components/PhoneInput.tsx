@@ -88,7 +88,7 @@ export default function PhoneInput({
           value={countryIso}
           disabled={disabled}
           onChange={(e) => handleCountryChange(e.target.value)}
-          className={`shrink-0 sm:w-[min(100%,13rem)] px-3 py-2 border border-[#E6E6E6] rounded-lg bg-white text-sm focus:ring-2 focus:ring-[#FF6C00] focus:border-transparent ${selectClassName}`}
+          className={`shrink-0 sm:w-28 px-2 py-2 border border-[#E6E6E6] rounded-lg bg-white text-sm focus:ring-2 focus:ring-[#FF6C00] focus:border-transparent ${selectClassName}`}
           aria-label="Indicatif pays"
         >
           {PHONE_COUNTRIES.map((c) => (

@@ -145,7 +145,8 @@ function CreateShipmentPage({ onNavigate }: CreateShipmentPageProps) {
       home_delivery: homeDelivery,
     };
     setFormData(updatedData);
-    if (homeDelivery && pickupMethod === 'home_pickup') {
+    if (homeDelivery) {
+      // relay→home and home→home: no destination relay to pick, go straight to summary
       setSelectedPickupRelay(null);
       setSelectedDeliveryRelay(null);
       setPaymentOptions({ printOption: 'self', needBox: false, promoCode: '' });
@@ -492,8 +493,10 @@ function CreateShipmentPage({ onNavigate }: CreateShipmentPageProps) {
                 }
               }}
               onBack={() => {
+                // home_delivery (relay→home and home→home) skip relay, back to delivery-mode
+                // relay→relay and home→relay went through relay
                 if (formData.home_delivery) {
-                  setCurrentStep('form');
+                  setCurrentStep('delivery-mode');
                 } else {
                   setCurrentStep('relay');
                 }

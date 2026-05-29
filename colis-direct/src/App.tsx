@@ -109,10 +109,13 @@ function AppContentWrapper() {
     const hash = window.location.hash || '';
     if (hash.startsWith('#/payment-success')) {
       setCurrentPage('payment-success');
+      // Remove Paystack query params + hash so a refresh doesn't re-trigger this
+      history.replaceState(null, '', window.location.pathname);
       return;
     }
     if (hash.startsWith('#/payment-cancel')) {
       setCurrentPage('payment-cancel');
+      history.replaceState(null, '', window.location.pathname);
       return;
     }
 
@@ -201,6 +204,8 @@ function AppContentWrapper() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    // Don't persist transient payment pages — they must not be restored on next visit
+    if (currentPage === 'payment-success' || currentPage === 'payment-cancel') return;
     window.localStorage.setItem(LAST_PAGE_STORAGE_KEY, currentPage);
   }, [currentPage]);
 

@@ -48,7 +48,6 @@ function ShipmentForm({ onSubmit, onSaveRecipient, onNavigate, initialData }: Sh
   const [showAddressBook, setShowAddressBook] = useState(false);
   const [recipientAddresses, setRecipientAddresses] = useState<any[]>([]);
   const [saveRecipientToAddressBook, setSaveRecipientToAddressBook] = useState(false);
-  const [saveSenderAddress, setSaveSenderAddress] = useState(false);
   const [showShippingAddressModal, setShowShippingAddressModal] = useState(false);
   const [shippingAddresses, setShippingAddresses] = useState<any[]>([]);
   const [loadingShippingAddresses, setLoadingShippingAddresses] = useState(false);
@@ -213,25 +212,6 @@ function ShipmentForm({ onSubmit, onSaveRecipient, onNavigate, initialData }: Sh
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Sauvegarder l'adresse d'expédition si demandé
-    if (user && saveSenderAddress) {
-      try {
-        await api.createSenderAddress({
-          label: 'Domicile',
-          first_name: formData.sender_first_name,
-          last_name: formData.sender_last_name,
-          email: formData.sender_email || '',
-          phone: formData.sender_phone,
-          commune: formData.sender_commune,
-          quartier: formData.sender_quartier,
-          address: formData.sender_address,
-          is_default: false,
-        });
-      } catch (err) {
-        console.error('Error saving sender address:', err);
-      }
-    }
-
     // Sauvegarder le destinataire dans le carnet si demandé
     if (user && saveRecipientToAddressBook && formData.recipient_first_name && formData.recipient_last_name) {
       try {
@@ -263,94 +243,76 @@ function ShipmentForm({ onSubmit, onSaveRecipient, onNavigate, initialData }: Sh
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
 
+      {/* ── Expéditeur (compact 30%) + Destinataire (large 70%) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[3fr_7fr] gap-6">
+
       {/* ── Expéditeur ── */}
-      <div className="bg-[#F6F7F9] p-6 rounded-xl">
+      <div className="bg-[#F6F7F9] p-6 rounded-xl flex flex-col">
         <h2 className="text-xl font-extrabold tracking-tight text-[#1A1A1A] flex items-center mb-6">
           <User className="w-5 h-5 mr-2 text-[#FF6C00]" />
           Expéditeur
         </h2>
 
         {user ? (
-          <div className="space-y-4">
-            {/* Infos profil en lecture seule */}
+          <div className="space-y-4 flex-1">
+            {/* Toutes les infos profil en lecture seule (y compris l'adresse) */}
             <div className="bg-white border border-[#E6E6E6] rounded-xl p-4">
-              <div className="flex items-center justify-between mb-3">
+              <div className="mb-4 space-y-2">
                 <span className="text-xs text-[#6B7280] flex items-center gap-1">
                   🔒 Informations issues de votre profil
                 </span>
-                <button
-                  type="button"
-                  onClick={() => onNavigate?.('my-profile')}
-                  className="text-xs text-[#FF6C00] hover:underline font-medium"
-                >
-                  Modifier dans mon profil
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowShippingAddressModal(true)}
+                    className="flex items-center gap-1 px-2.5 py-1 text-xs text-[#FF6C00] hover:text-[#E66100] font-semibold border border-[#FF6C00] rounded-lg hover:bg-[#FFF3E8] transition-colors"
+                  >
+                    <Edit className="w-3 h-3" />
+                    Changer l'adresse
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate?.('my-profile')}
+                    className="text-xs text-[#FF6C00] hover:underline font-semibold"
+                  >
+                    Modifier mon profil
+                  </button>
+                </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 text-sm">
                 <div>
-                  <span className="text-[#6B7280]">Nom</span>
-                  <p className="font-medium text-[#1A1A1A]">{formData.sender_last_name || <span className="text-[#9CA3AF] italic">Non renseigné</span>}</p>
+                  <span className="text-xs text-[#6B7280]">Nom</span>
+                  <p className="font-medium text-[#1A1A1A] truncate">{formData.sender_last_name || <span className="text-[#9CA3AF] italic">Non renseigné</span>}</p>
                 </div>
                 <div>
-                  <span className="text-[#6B7280]">Prénom</span>
-                  <p className="font-medium text-[#1A1A1A]">{formData.sender_first_name || <span className="text-[#9CA3AF] italic">Non renseigné</span>}</p>
+                  <span className="text-xs text-[#6B7280]">Prénom</span>
+                  <p className="font-medium text-[#1A1A1A] truncate">{formData.sender_first_name || <span className="text-[#9CA3AF] italic">Non renseigné</span>}</p>
                 </div>
                 <div>
-                  <span className="text-[#6B7280]">Téléphone</span>
-                  <p className="font-medium text-[#1A1A1A]">{formData.sender_phone || <span className="text-[#9CA3AF] italic">Non renseigné</span>}</p>
+                  <span className="text-xs text-[#6B7280]">Téléphone</span>
+                  <p className="font-medium text-[#1A1A1A] truncate">{formData.sender_phone || <span className="text-[#9CA3AF] italic">Non renseigné</span>}</p>
                 </div>
                 <div>
-                  <span className="text-[#6B7280]">Email</span>
-                  <p className="font-medium text-[#1A1A1A]">{formData.sender_email || <span className="text-[#9CA3AF] italic">Non renseigné</span>}</p>
+                  <span className="text-xs text-[#6B7280]">Email</span>
+                  <p className="font-medium text-[#1A1A1A] truncate">{formData.sender_email || <span className="text-[#9CA3AF] italic">Non renseigné</span>}</p>
                 </div>
                 <div>
-                  <span className="text-[#6B7280]">Commune</span>
-                  <p className="font-medium text-[#1A1A1A]">{formData.sender_commune || <span className="text-orange-500 font-semibold">⚠ Non renseigné — requis</span>}</p>
+                  <span className="text-xs text-[#6B7280]">Commune</span>
+                  <p className="font-medium text-[#1A1A1A] truncate">{formData.sender_commune || <span className="text-orange-500 font-semibold text-xs">⚠ Requis</span>}</p>
                 </div>
                 <div>
-                  <span className="text-[#6B7280]">Quartier</span>
-                  <p className="font-medium text-[#1A1A1A]">{formData.sender_quartier || <span className="text-orange-500 font-semibold">⚠ Non renseigné — requis</span>}</p>
+                  <span className="text-xs text-[#6B7280]">Quartier</span>
+                  <p className="font-medium text-[#1A1A1A] truncate">{formData.sender_quartier || <span className="text-orange-500 font-semibold text-xs">⚠ Requis</span>}</p>
+                </div>
+                <div className="sm:col-span-2 lg:col-span-1">
+                  <span className="text-xs text-[#6B7280] flex items-center gap-1">
+                    <Home className="w-3 h-3" />
+                    Adresse
+                  </span>
+                  <p className="font-medium text-[#1A1A1A] text-sm leading-relaxed">{formData.sender_address || <span className="text-orange-500 font-semibold text-xs">⚠ Requis — utilisez "Changer l'adresse"</span>}</p>
                 </div>
               </div>
             </div>
-
-            {/* Adresse d'expédition — modifiable */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-semibold text-[#3A3A3A]">
-                  <Home className="w-4 h-4 inline mr-1" />
-                  Description précise de l'adresse *
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowShippingAddressModal(true)}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#FF6C00] hover:text-[#E66100] font-medium border border-[#FF6C00] rounded-lg hover:bg-[#FFF3E8] transition-colors"
-                >
-                  <Edit className="w-4 h-4" />
-                  Changer l'adresse
-                </button>
-              </div>
-              <textarea
-                name="sender_address"
-                value={formData.sender_address}
-                onChange={handleChange}
-                required
-                rows={2}
-                placeholder="Ex: En face de la pharmacie principale, 2ème rue à gauche"
-                className="w-full px-4 py-2 border border-[#E6E6E6] rounded-xl focus:ring-2 focus:ring-[#FF6C00] focus:border-transparent transition-all"
-              />
-            </div>
-
-            {/* Checkbox sauvegarder adresse expéditeur */}
-            <label className="flex items-center gap-2 cursor-pointer text-sm text-[#3A3A3A]">
-              <input
-                type="checkbox"
-                checked={saveSenderAddress}
-                onChange={(e) => setSaveSenderAddress(e.target.checked)}
-                className="w-4 h-4 accent-[#FF6C00] focus:ring-[#FF6C00] rounded"
-              />
-              Sauvegarder cette adresse d'expédition dans mon profil
-            </label>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -530,8 +492,8 @@ function ShipmentForm({ onSubmit, onSaveRecipient, onNavigate, initialData }: Sh
       </div>
 
       {/* ── Destinataire ── */}
-      <div className="bg-[#F6F7F9] p-6 rounded-xl">
-        <div className="flex items-center justify-between mb-6">
+      <div className="bg-[#F6F7F9] p-6 rounded-xl flex flex-col">
+        <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
           <h2 className="text-xl font-extrabold tracking-tight text-[#1A1A1A] flex items-center">
             <User className="w-5 h-5 mr-2 text-[#FF6C00]" />
             Destinataire
@@ -585,7 +547,7 @@ function ShipmentForm({ onSubmit, onSaveRecipient, onNavigate, initialData }: Sh
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-semibold text-[#3A3A3A] mb-2">Nom *</label>
             <input type="text" name="recipient_last_name" value={formData.recipient_last_name}
@@ -622,7 +584,7 @@ function ShipmentForm({ onSubmit, onSaveRecipient, onNavigate, initialData }: Sh
               onChange={handleChange} required
               className="w-full px-4 py-2 border border-[#E6E6E6] rounded-xl focus:ring-2 focus:ring-[#FF6C00] focus:border-transparent transition-all" />
           </div>
-          <div className="md:col-span-2">
+          <div className="sm:col-span-2">
             <label className="block text-sm font-semibold text-[#3A3A3A] mb-2">
               <Home className="w-4 h-4 inline mr-1" />Description précise de l'adresse *
             </label>
@@ -631,7 +593,7 @@ function ShipmentForm({ onSubmit, onSaveRecipient, onNavigate, initialData }: Sh
               placeholder="Ex: En face de la pharmacie principale, 2ème rue à gauche"
               className="w-full px-4 py-2 border border-[#E6E6E6] rounded-xl focus:ring-2 focus:ring-[#FF6C00] focus:border-transparent transition-all" />
           </div>
-          <div className="md:col-span-2">
+          <div className="sm:col-span-2">
             <label className="block text-sm font-semibold text-[#3A3A3A] mb-2">
               <MapPin className="w-4 h-4 inline mr-1" />Repère (optionnel)
             </label>
@@ -650,6 +612,8 @@ function ShipmentForm({ onSubmit, onSaveRecipient, onNavigate, initialData }: Sh
             Ajouter ce destinataire à mon carnet d'adresses
           </label>
         )}
+      </div>
+
       </div>
 
       {/* ── Informations du colis ── */}

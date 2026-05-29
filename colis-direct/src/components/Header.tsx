@@ -115,14 +115,9 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
           <div className="flex items-center justify-between h-16 sm:h-[68px]">
 
             {/* ── Logo ── */}
-            <button
-              type="button"
-              onClick={() => onNavigate('home')}
-              className="focus:outline-none flex-shrink-0"
-              aria-label="Accueil"
-            >
-              <Logo size="sm" showText />
-            </button>
+            <div className="flex-shrink-0">
+              <Logo size="sm" showText onClick={() => onNavigate('home')} />
+            </div>
 
             {/* ── Desktop nav ── */}
             <nav className="hidden lg:flex items-center gap-7">

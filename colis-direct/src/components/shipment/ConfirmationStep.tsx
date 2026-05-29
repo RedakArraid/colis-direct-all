@@ -552,8 +552,8 @@ function ConfirmationStep({
         </ul>
       </div>
 
-      {/* Trouvez un point relais de dépôt — uniquement pour dépôt relais (relay_deposit), pas pour ramassage à domicile */}
-      {pickupMethod !== 'home_pickup' && !homeDelivery && (
+      {/* Trouvez un point relais de dépôt — pour tous les modes relay_deposit (relay→relay et relay→home) */}
+      {pickupMethod === 'relay_deposit' && (
         <div className="max-w-3xl mx-auto w-full">
           <DepositRelayFinder
             destinationRelayId={shipmentData?.destination_relay_id ?? null}
