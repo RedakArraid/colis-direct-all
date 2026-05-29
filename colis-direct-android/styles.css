@@ -431,6 +431,7 @@ h4 { font-size: 14px; font-weight: 600; line-height: 1.4; }
   border-radius: 20px;
   border: 1px solid var(--cd-line);
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .card-shadow {
@@ -1714,6 +1715,7 @@ h4 { font-size: 14px; font-weight: 600; line-height: 1.4; }
   cursor: pointer;
   transition: all 0.15s;
   background: #fff;
+  flex-shrink: 0;
 }
 
 .payment-pill.selected {
@@ -2022,6 +2024,7 @@ h4 { font-size: 14px; font-weight: 600; line-height: 1.4; }
   cursor: pointer;
   transition: all 0.15s ease;
   margin-bottom: 8px;
+  flex-shrink: 0;
 }
 .payment-pill:active { transform: scale(0.98); }
 .payment-pill.selected {
