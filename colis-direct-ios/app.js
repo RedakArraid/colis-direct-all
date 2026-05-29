@@ -109,6 +109,7 @@ const ICONS = {
   wallet:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>`,
   bike:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>`,
   book:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10M6 10h10"/></svg>`,
+  tag:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/></svg>`,
 };
 
 function icon(name, size = 20, color = 'currentColor') {
@@ -1917,6 +1918,66 @@ function renderCreateShipment() {
   `;
 }
 
+function saveStep1Inputs() {
+  const getVal = (id) => document.getElementById(id)?.value?.trim() || '';
+  const getSelectVal = (id) => document.getElementById(id)?.value || '';
+
+  if (document.getElementById('s-fname')) {
+    createData.sender_first_name = getVal('s-fname');
+    createData.sender_last_name = getVal('s-lname');
+    createData.sender_email = getVal('s-email');
+    createData.sender_phone = getVal('s-phone');
+    createData.sender_commune = getSelectVal('s-commune');
+    createData.sender_quartier = getVal('s-quartier');
+    createData.sender_address = getVal('s-address');
+    createData.sender_repere = getVal('s-repere');
+  }
+
+  if (document.getElementById('r-fname')) {
+    createData.recipient_first_name = getVal('r-fname');
+    createData.recipient_last_name = getVal('r-lname');
+    createData.recipient_email = getVal('r-email');
+    createData.recipient_phone = getVal('r-phone');
+    createData.recipient_commune = getSelectVal('r-commune');
+    createData.recipient_quartier = getVal('r-quartier');
+    createData.recipient_address = getVal('r-address');
+    createData.recipient_repere = getVal('r-repere');
+  }
+
+  const weightVal = parseFloat(document.getElementById('c-weight')?.value);
+  if (!isNaN(weightVal)) createData.weight = weightVal;
+}
+
+function saveStep2Inputs() {
+  const descEl = document.getElementById('c-desc');
+  if (descEl) {
+    createData.description = descEl.value.trim();
+  }
+}
+
+function calculatePrice(pickupMethod, homeDelivery) {
+  const isIntra = createData.sender_commune === createData.recipient_commune;
+  let basePrice = 0;
+  
+  if (createData.grid_type === 'courier') {
+    basePrice = isIntra ? 600 : 1000;
+  } else {
+    const prices = {
+      petit: isIntra ? 1000 : 1500,
+      moyen: isIntra ? 1500 : 2000,
+      grand: isIntra ? 2000 : 2500
+    };
+    basePrice = prices[createData.package_type || 'petit'];
+  }
+  
+  const fragileFee = createData.is_fragile ? 500 : 0;
+  const insuredFee = createData.is_insured ? 500 : 0;
+  const pickupFee = pickupMethod === 'home_pickup' ? 500 : 0;
+  const deliveryFee = homeDelivery ? 500 : 0;
+  
+  return basePrice + fragileFee + insuredFee + pickupFee + deliveryFee;
+}
+
 function stepInformations() {
   const isLogged = !!State.user;
   
@@ -2091,7 +2152,7 @@ function stepInformations() {
       <div style="display:grid;grid-template-columns:${gridType === 'colis' ? '1fr 1fr' : '1fr'};gap:10px;margin-bottom:14px">
         ${gridType === 'colis' ? `
           <div class="form-group"><label class="form-label">Taille du colis *</label>
-            <select class="form-select" id="c-size" onchange="createData.package_type=this.value;createData.weight=this.value==='petit'?1:this.value==='moyen'?5:12;document.getElementById('c-weight').value=createData.weight">
+            <select class="form-select" id="c-size" onchange="updatePackageSize(this.value)">
               <option value="petit" ${size==='petit'?'selected':''}>Petit (≤ 2 kg)</option>
               <option value="moyen" ${size==='moyen'?'selected':''}>Moyen (2–10 kg)</option>
               <option value="grand" ${size==='grand'?'selected':''}>Grand (> 10 kg)</option>
@@ -2125,44 +2186,130 @@ function stepInformations() {
 }
 
 function stepDeliveryMode() {
-  const pickup = createData.pickup_method || 'relay_deposit';
-  const delivery = createData.home_delivery ? 'home' : 'relay';
+  const activePickup = createData.pickup_method || 'relay_deposit';
+  const activeHomeDelivery = createData.home_delivery || false;
+  const isIntra = createData.sender_commune === createData.recipient_commune;
+  
+  const modes = [
+    {
+      key: 'relay_to_relay',
+      label: 'Relais ➔ Relais',
+      emoji: '📦',
+      pickup_method: 'relay_deposit',
+      home_delivery: false,
+      desc: 'Déposez et retirez votre colis en point relais partenaire.',
+      delay: isIntra ? 'J+1' : 'J+1 à J+2',
+      is_cheapest: true
+    },
+    {
+      key: 'relay_to_home',
+      label: 'Relais ➔ Domicile',
+      emoji: '🏘️',
+      pickup_method: 'relay_deposit',
+      home_delivery: true,
+      desc: 'Déposez votre colis en relais, livraison à domicile du destinataire.',
+      delay: 'J+1'
+    },
+    {
+      key: 'home_to_relay',
+      label: 'Domicile ➔ Relais',
+      emoji: '📦',
+      pickup_method: 'home_pickup',
+      home_delivery: false,
+      desc: 'Ramassage à votre adresse, retrait en point relais partenaire.',
+      delay: 'J+1'
+    },
+    {
+      key: 'home_to_home',
+      label: 'Domicile ➔ Domicile',
+      emoji: '🏠',
+      pickup_method: 'home_pickup',
+      home_delivery: true,
+      desc: 'Ramassage à votre adresse et livraison directe à domicile.',
+      delay: isIntra ? 'Même jour' : 'J+1'
+    }
+  ];
 
   return `
-    <div style="background:#F6F7F9;border-radius:16px;padding:16px">
-      <div style="font-size:16px;font-weight:800;color:#1A1A1A;margin-bottom:14px">Mode de collecte</div>
-      ${[
-        { id: 'relay_deposit', label: 'Dépôt en point relais', sub: 'Déposez votre colis dans un relais partenaire', icon: 'store', bg: '#FFF3E8', color: '#FF6C00' },
-        { id: 'home_pickup',   label: 'Ramassage à domicile',  sub: 'Un livreur vient récupérer chez vous (+500 F)', icon: 'home',  bg: '#EEF4FF', color: '#2F6BE0' },
-      ].map(m => `
-        <div class="delivery-mode-card ${pickup === m.id ? 'selected' : ''}" onclick="createData.pickup_method='${m.id}';document.getElementById('cs-content').innerHTML=stepDeliveryMode()">
-          <div class="delivery-mode-icon" style="background:${pickup===m.id?'#FF6C00':m.bg}">${icon(m.icon, 20, pickup===m.id?'white':m.color)}</div>
-          <div style="flex:1"><div style="font-size:14px;font-weight:700;color:#1A1A1A">${m.label}</div><div style="font-size:12px;color:#6B7280;margin-top:2px">${m.sub}</div></div>
-        </div>
-      `).join('')}
+    <div style="font-size:14px;font-weight:700;color:#FF6C00;margin-bottom:4px">Choisissez votre mode de livraison</div>
+    <div style="font-size:12px;color:#6B7280;margin-bottom:14px;display:flex;align-items:center;gap:4px">
+      ${createData.sender_commune || ''} ➔ ${createData.recipient_commune || ''} • 
+      <span style="font-weight:700;color:#1A1A1A">
+        ${createData.grid_type === 'courier' ? 'Courrier' : createData.package_type === 'petit' ? 'Petit colis' : createData.package_type === 'moyen' ? 'Colis moyen' : 'Grand colis'}
+      </span>
     </div>
 
-    <div style="background:#F6F7F9;border-radius:16px;padding:16px">
-      <div style="font-size:16px;font-weight:800;color:#1A1A1A;margin-bottom:14px">Mode de livraison</div>
-      ${[
-        { id: 'relay', label: 'Livraison en point relais', sub: 'Le destinataire retire dans un relais partenaire', icon: 'store', bg: '#FFF3E8', color: '#FF6C00' },
-        { id: 'home',  label: 'Livraison à domicile',      sub: 'Livraison directement chez le destinataire (+500 F)', icon: 'home', bg: '#EEF4FF', color: '#2F6BE0' },
-      ].map(m => `
-        <div class="delivery-mode-card ${delivery === m.id ? 'selected' : ''}" onclick="createData.home_delivery=${m.id==='home'};document.getElementById('cs-content').innerHTML=stepDeliveryMode()">
-          <div class="delivery-mode-icon" style="background:${delivery===m.id?'#FF6C00':m.bg}">${icon(m.icon, 20, delivery===m.id?'white':m.color)}</div>
-          <div style="flex:1"><div style="font-size:14px;font-weight:700;color:#1A1A1A">${m.label}</div><div style="font-size:12px;color:#6B7280;margin-top:2px">${m.sub}</div></div>
+    ${!isIntra ? `
+      <div style="padding:12px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:14px;font-size:11px;color:#B45309;display:flex;align-items:start;gap:8px;margin-bottom:14px;line-height:1.4">
+        <span style="font-size:14px;margin-top:-2px">ℹ️</span>
+        <div>
+          <strong>Tarif inter-communes :</strong> Vous effectuez un envoi vers une autre commune. Les modes avec relais vous font économiser automatiquement sur vos frais d'envoi.
         </div>
-      `).join('')}
+      </div>
+    ` : ''}
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      ${modes.map(m => {
+        const isSelected = activePickup === m.pickup_method && activeHomeDelivery === m.home_delivery;
+        const price = calculatePrice(m.pickup_method, m.home_delivery);
+        return `
+          <div class="delivery-mode-card ${isSelected ? 'selected' : ''}" onclick="selectDeliveryMode('${m.pickup_method}', ${m.home_delivery})"
+            style="position:relative;display:flex;flex-direction:column;gap:6px;padding:14px;border:2px solid ${isSelected ? '#FF6C00' : '#E6E6E6'};background:${isSelected ? '#FFF3E8' : '#fff'};border-radius:16px;cursor:pointer;transition:all .2s;min-height:130px;box-shadow:${isSelected ? '0 4px 12px rgba(255,108,0,0.08)' : 'none'}">
+            
+            <!-- Badge Meilleur Prix -->
+            ${m.is_cheapest ? `
+              <div style="position:absolute;top:-9px;left:10px;background:#10B981;color:#fff;font-size:8px;font-weight:900;padding:2px 6px;border-radius:20px;display:flex;align-items:center;gap:3px;box-shadow:0 2px 4px rgba(16,185,129,0.15);letter-spacing:0.3px;z-index:2">
+                ${icon('tag', 8, '#fff')} MEILLEUR PRIX
+              </div>
+            ` : ''}
+
+            <!-- Top line: Emoji + Label, and checkCircle if selected -->
+            <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+              <span style="font-size:12.5px;font-weight:800;color:#1A1A1A;display:flex;align-items:center;gap:5px">
+                <span style="font-size:16px">${m.emoji}</span> ${m.label}
+              </span>
+              ${isSelected ? icon('checkCircle', 16, '#FF6C00') : ''}
+            </div>
+
+            <!-- Middle: Description -->
+            <div style="font-size:10.5px;color:#6B7280;line-height:1.3;margin-top:2px;flex:1">
+              ${m.desc}
+            </div>
+
+            <!-- Bottom line: Price + Delay -->
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;width:100%;margin-top:auto;padding-top:6px;border-top:1px solid ${isSelected ? '#FFD4A8' : '#F3F4F6'}">
+              <div style="display:flex;align-items:center;gap:2px;color:#FF6C00;font-size:10px;font-weight:700">
+                ${icon('clock', 11, '#FF6C00')} ${m.delay}
+              </div>
+              <div style="text-align:right">
+                <span style="font-size:15px;font-weight:900;color:#1A1A1A">${price.toLocaleString('fr-FR')}</span>
+                <span style="font-size:9px;color:#6B7280;font-weight:700">F</span>
+              </div>
+            </div>
+
+          </div>
+        `;
+      }).join('')}
     </div>
 
-    <div class="form-group">
-      <label class="form-label">Description du contenu</label>
+    <!-- Description du contenu -->
+    <div class="form-group" style="margin-top:8px">
+      <label class="form-label">Description du contenu *</label>
       <textarea class="form-input" id="c-desc" rows="2" style="resize:none" placeholder="Ex: vêtements, documents, appareils…">${createData.description || ''}</textarea>
     </div>
   `;
 }
 
+function selectDeliveryMode(pickupMethod, homeDelivery) {
+  saveStep2Inputs();
+  createData.pickup_method = pickupMethod;
+  createData.home_delivery = homeDelivery;
+  const contentEl = document.getElementById('cs-content');
+  if (contentEl) contentEl.innerHTML = stepDeliveryMode();
+}
+
 function updateGridType(type) {
+  saveStep1Inputs();
   createData.grid_type = type;
   if (type === 'courier') {
     createData.package_type = 'petit';
@@ -2178,6 +2325,7 @@ function updateGridType(type) {
 }
 
 function updatePackageSize(size) {
+  saveStep1Inputs();
   createData.package_type = size;
   createData.weight = size === 'petit' ? 1 : size === 'moyen' ? 5 : 12;
   const contentEl = document.getElementById('cs-content');
@@ -2185,6 +2333,7 @@ function updatePackageSize(size) {
 }
 
 function toggleOption(optKey) {
+  saveStep1Inputs();
   createData[optKey] = !createData[optKey];
   const contentEl = document.getElementById('cs-content');
   if (contentEl) contentEl.innerHTML = stepInformations();
@@ -2324,16 +2473,16 @@ function stepSummary() {
       moyen: isIntra ? 1500 : 2000,
       grand: isIntra ? 2000 : 2500
     };
-    basePrice = prices[createData.package_type || 'moyen'];
+    basePrice = prices[createData.package_type || 'petit'];
     const sizeLabels = { petit: 'Petit (< 3kg)', moyen: 'Moyen (3–10kg)', grand: 'Grand (> 10kg)' };
-    baseLabel = 'Colis ' + sizeLabels[createData.package_type || 'moyen'];
+    baseLabel = 'Colis ' + sizeLabels[createData.package_type || 'petit'];
   }
   
   const fragileFee = createData.is_fragile ? 500 : 0;
   const insuredFee = createData.is_insured ? 500 : 0;
   const pickupFee = createData.pickup_method === 'home_pickup' ? 500 : 0;
   const deliveryFee = createData.home_delivery ? 500 : 0;
-  const total = basePrice + fragileFee + insuredFee + pickupFee + deliveryFee;
+  const total = calculatePrice(createData.pickup_method, createData.home_delivery);
   const payment = createData.payment_method || 'paystack';
 
   return `
@@ -2483,23 +2632,7 @@ async function submitShipment() {
 
   await new Promise(r => setTimeout(r, 1400));
 
-  const isIntra = createData.sender_commune === createData.recipient_commune;
-  let basePrice = 0;
-  if (createData.grid_type === 'courier') {
-    basePrice = isIntra ? 600 : 1000;
-  } else {
-    const prices = {
-      petit: isIntra ? 1000 : 1500,
-      moyen: isIntra ? 1500 : 2000,
-      grand: isIntra ? 2000 : 2500
-    };
-    basePrice = prices[createData.package_type || 'moyen'];
-  }
-  const fragileFee = createData.is_fragile ? 500 : 0;
-  const insuredFee = createData.is_insured ? 500 : 0;
-  const pickupFee = createData.pickup_method === 'home_pickup' ? 500 : 0;
-  const deliveryFee = createData.home_delivery ? 500 : 0;
-  const finalPrice = basePrice + fragileFee + insuredFee + pickupFee + deliveryFee;
+  const finalPrice = calculatePrice(createData.pickup_method, createData.home_delivery);
 
   const code = Math.floor(1000 + Math.random() * 9000) + ['AB','CD','EF','GH'][Math.floor(Math.random()*4)];
   const trackingNum = 'CD' + Date.now().toString().slice(-10) + 'CI';
