@@ -694,6 +694,26 @@ function renderShipments() {
   const el = document.getElementById('screen-shipments');
   if (!el) return;
 
+  if (!State.user) {
+    el.innerHTML = `
+      <div class="app-header">
+        <div style="font-size:17px;font-weight:700;color:#1A1A1A;flex:1">Mes colis</div>
+      </div>
+      <div class="empty-state" style="padding-top:60px">
+        <div class="empty-icon">${icon('package', 36, '#FF6C00')}</div>
+        <div class="empty-title">Suivez vos colis</div>
+        <div class="empty-sub">Connectez-vous pour voir l'historique de vos colis et suivre vos envois en temps réel.</div>
+        <button class="btn btn-primary" style="margin-top:20px;padding:14px 32px" onclick="Router.navigate('login')">
+          Se connecter
+        </button>
+        <button class="btn btn-ghost" onclick="Router.navigate('login')" style="margin-top:4px">
+          Créer un compte
+        </button>
+      </div>
+    `;
+    return;
+  }
+
   const all = DEMO_SHIPMENTS;
   const active = all.filter(s => !['PICKED_UP_BY_CUSTOMER','DELIVERED','DELIVERED_TO_CUSTOMER','CANCELLED','RETURN_TO_SENDER'].includes(s.current_status));
   const delivered = all.filter(s => ['PICKED_UP_BY_CUSTOMER','DELIVERED','DELIVERED_TO_CUSTOMER'].includes(s.current_status));
