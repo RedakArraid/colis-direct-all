@@ -459,7 +459,7 @@ function renderHome() {
     <div class="app-header">
       <div class="app-header-logo" onclick="Router.navigate('home')" style="cursor:pointer">
         ${LOGO_SMALL}
-        <span class="logo-text">COLIS<span style="color:#FF6C00">DIRECT</span></span>
+        <span class="logo-text" style="color:#000000">COLISDIRECT</span>
       </div>
       <button class="header-action" onclick="Router.navigate('notifications')" style="position:relative" id="btn-notif-home">
         ${icon('bell', 20)}

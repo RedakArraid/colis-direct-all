@@ -2473,7 +2473,7 @@ function TransporterLoginPage({ onNavigate }: TransporterLoginPageProps) {
                       );
                     })}
                   </div>
-                )}
+                ) : null}
               </div>
             )}
 
