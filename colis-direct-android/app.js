@@ -496,19 +496,11 @@ function renderHome() {
       <div class="services-grid">
         <div class="service-item" id="svc-envoyer" onclick="Router.navigate('create-shipment')">
           <div class="service-icon" style="background:#FFF3E8">${icon('package', 24, '#FF6C00')}</div>
-          <span class="service-label">Envoyer</span>
-        </div>
-        <div class="service-item" id="svc-suivre" onclick="Router.navigate('tracking')">
-          <div class="service-icon" style="background:#EEF4FF">${icon('search', 24, '#2F6BE0')}</div>
-          <span class="service-label">Suivre</span>
+          <span class="service-label" style="text-align:center">Envoyer un colis</span>
         </div>
         <div class="service-item" id="svc-relais" onclick="Router.navigate('map')">
           <div class="service-icon" style="background:#E6F6EC">${icon('mapPin', 24, '#16A34A')}</div>
-          <span class="service-label">Relais</span>
-        </div>
-        <div class="service-item" id="svc-tarifs" onclick="Router.navigate('pricing')">
-          <div class="service-icon" style="background:#FEF8E7">${icon('receipt', 24, '#F5B400')}</div>
-          <span class="service-label">Tarifs</span>
+          <span class="service-label" style="text-align:center">Trouver un relais</span>
         </div>
       </div>
     </div>
