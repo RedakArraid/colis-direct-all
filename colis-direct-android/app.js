@@ -513,7 +513,7 @@ function renderHome() {
           Tout voir ${icon('chevronRight', 14, '#FF6C00')}
         </button>
       </div>
-      <div class="scroll-x" style="padding-bottom:4px">
+      <div class="scroll-x" style="padding-bottom:4px;margin-bottom:20px">
         <div class="scroll-x-inner">
           ${activeShipments.map(s => renderPackageCard(s)).join('')}
         </div>
@@ -620,10 +620,6 @@ function renderPackageCard(s) {
           <span style="font-size:10px;color:#6B7280">Progression</span>
           <span style="font-size:10px;font-weight:700;color:#FF6C00">${progress}%</span>
         </div>
-      </div>
-      <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:14px;font-weight:800;color:#FF6C00">${s.price?.toLocaleString()} FCFA</span>
-        <span style="font-size:11px;color:#9CA3AF">${s.package_type === 'petit' ? 'Petit' : s.package_type === 'moyen' ? 'Moyen' : 'Grand'} · ${s.weight}kg</span>
       </div>
     </div>
   `;
