@@ -860,17 +860,19 @@ function renderTracking(prefill = '') {
     <div id="tracking-result-zone" style="padding:16px"></div>
 
     <!-- Recent demo -->
-    <div class="section-label" style="padding:8px 16px 6px">Recherches récentes</div>
-    ${DEMO_SHIPMENTS.slice(0,3).map(s => `
-      <div class="list-item" onclick="quickTrack('${s.tracking_number}')">
-        <div class="list-item-icon" style="background:#FFF3E8">${icon('clock', 16, '#FF6C00')}</div>
-        <div class="list-item-content">
-          <div style="font-size:12px;font-family:monospace;font-weight:700;color:#FF6C00;letter-spacing:0.04em">${s.tracking_number}</div>
-          <div class="list-item-sub">${s.sender_commune} → ${s.recipient_commune} · ${s.recipient_first_name} ${s.recipient_last_name}</div>
+    ${State.user ? `
+      <div class="section-label" style="padding:8px 16px 6px">Recherches récentes</div>
+      ${DEMO_SHIPMENTS.slice(0,3).map(s => `
+        <div class="list-item" onclick="quickTrack('${s.tracking_number}')">
+          <div class="list-item-icon" style="background:#FFF3E8">${icon('clock', 16, '#FF6C00')}</div>
+          <div class="list-item-content">
+            <div style="font-size:12px;font-family:monospace;font-weight:700;color:#FF6C00;letter-spacing:0.04em">${s.tracking_number}</div>
+            <div class="list-item-sub">${s.sender_commune} → ${s.recipient_commune} · ${s.recipient_first_name} ${s.recipient_last_name}</div>
+          </div>
+          ${icon('chevronRight', 15, '#D1D5DB')}
         </div>
-        ${icon('chevronRight', 15, '#D1D5DB')}
-      </div>
-    `).join('')}
+      `).join('')}
+    ` : ''}
   `;
 
   if (prefill) setTimeout(doTrack, 250);
