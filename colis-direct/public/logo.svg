@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="180" height="40" viewBox="0 0 180 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="180" height="40" rx="8" fill="#231F20"/>
+  <path d="M26.4 11H15.6C13.061 11 11 13.061 11 15.6V26.4C11 28.939 13.061 31 15.6 31H26.4C28.939 31 31 28.939 31 26.4V15.6C31 13.061 28.939 11 26.4 11ZM20.2 23.58L17.22 20.6L18.881 18.939L20.2 20.258L23.719 16.739L25.38 18.4L20.2 23.58Z" fill="#FF6C00"/>
+  <text x="40" y="26" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="600" letter-spacing="0.5">
+    COLISDIRECT
+  </text>
+</svg>
+

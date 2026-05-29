@@ -1,0 +1,22 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install system dependencies (curl for healthcheck, bash for scripts if needed)
+RUN apk add --no-cache curl bash
+
+# Copy package files first for better caching
+COPY package*.json ./
+
+# Install ALL dependencies (including devDependencies for hot-reload)
+RUN npm ci --include=dev || npm install
+
+# Expose port
+EXPOSE 3001
+
+# Note: Le code source sera monté via volume dans docker-compose.dev.yml
+# Pas besoin de COPY . ici car on utilise un volume
+
+# Commande par défaut (sera surchargée par docker-compose.dev.yml)
+CMD ["npm", "run", "dev"]
+

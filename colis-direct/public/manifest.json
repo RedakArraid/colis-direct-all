@@ -1,0 +1,40 @@
+{
+  "name": "Colis Direct",
+  "short_name": "Colis Direct",
+  "description": "Livraison de colis à Abidjan et dans toute la Côte d'Ivoire",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#FF6C00",
+  "orientation": "portrait-primary",
+  "lang": "fr-CI",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["shopping", "logistics"],
+  "shortcuts": [
+    {
+      "name": "Envoyer un colis",
+      "short_name": "Envoyer",
+      "url": "/#/create-shipment",
+      "description": "Créer un nouvel envoi"
+    },
+    {
+      "name": "Suivre un colis",
+      "short_name": "Suivre",
+      "url": "/#/tracking",
+      "description": "Suivre l'état d'un colis"
+    }
+  ]
+}

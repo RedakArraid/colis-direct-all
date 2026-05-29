@@ -1,0 +1,167 @@
+# =============================================================================
+# DOCKER COMPOSE - Colis Direct STAGING
+# =============================================================================
+# Configuration indépendante pour l'environnement de staging
+# Utilisation:
+#   - Démarrer:  docker compose -f docker-compose.staging.yml --env-file .env.staging up -d
+#   - Arrêter:   docker compose -f docker-compose.staging.yml down
+#   - Logs:      docker compose -f docker-compose.staging.yml logs -f
+#   - Rebuild:   docker compose -f docker-compose.staging.yml --env-file .env.staging up -d --build
+# Le nom de projet est fixé ci-dessous — pas besoin de --project-name
+# =============================================================================
+
+name: colisdirect-staging
+
+services:
+  # ===========================================================================
+  # Colis Direct Backend Staging
+  # ===========================================================================
+  colisdirect-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: colisdirect-backend-staging
+    env_file:
+      - .env.staging
+    environment:
+      - NODE_ENV=staging
+      - PORT=3001
+      - RUN_MIGRATIONS=true
+      - DATABASE_URL=postgresql://${COLISDIRECT_STAGING_DB_USER:-colisdirect_staging}:${COLISDIRECT_STAGING_DB_PASSWORD:-colisdirect_staging_password}@colisdirect-db-staging:5432/${COLISDIRECT_STAGING_DB_NAME:-colisdirect_staging_db}
+      - DB_HOST=colisdirect-db-staging
+      - DB_PORT=5432
+      # Mapping pour que le backend trouve les variables (connection.ts cherche DB_NAME/DB_USER/DB_PASSWORD ou COLISDIRECT_DB_*)
+      - DB_NAME=${COLISDIRECT_STAGING_DB_NAME:-colisdirect_staging_db}
+      - DB_USER=${COLISDIRECT_STAGING_DB_USER:-colisdirect_staging}
+      - DB_PASSWORD=${COLISDIRECT_STAGING_DB_PASSWORD:-colisdirect_staging_password}
+      # Aussi disponible sous les noms COLISDIRECT_DB_* pour compatibilité
+      - COLISDIRECT_DB_NAME=${COLISDIRECT_STAGING_DB_NAME:-colisdirect_staging_db}
+      - COLISDIRECT_DB_USER=${COLISDIRECT_STAGING_DB_USER:-colisdirect_staging}
+      - COLISDIRECT_DB_PASSWORD=${COLISDIRECT_STAGING_DB_PASSWORD:-colisdirect_staging_password}
+      - JWT_SECRET=${COLISDIRECT_JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - CINETPAY_BASE_URL=https://api-checkout.cinetpay.com/v2
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_SECURE=${SMTP_SECURE:-false}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - EMAIL_FROM=${EMAIL_FROM}
+      - FRONTEND_URL=https://staging.colisdirect.com
+      - BACKEND_URL=https://staging-api.colisdirect.com
+    volumes:
+      - ./database/migrations:/app/database/migrations:ro
+    depends_on:
+      colisdirect-db-staging:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - traefik_network
+      - colisdirect_internal_staging
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.colisdirect-api-staging.rule=Host(`staging-api.colisdirect.com`)
+      - traefik.http.routers.colisdirect-api-staging.entrypoints=websecure
+      - traefik.http.routers.colisdirect-api-staging.tls=true
+      - traefik.http.routers.colisdirect-api-staging.tls.certresolver=mytlschallenge
+      - traefik.http.routers.colisdirect-api-staging.service=colisdirect-api-staging
+      - traefik.http.services.colisdirect-api-staging.loadbalancer.server.port=3001
+      # CORS Headers - Configuration pour toutes les requêtes
+      - traefik.http.middlewares.colisdirect-cors-headers-staging.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,OPTIONS,PATCH
+      - traefik.http.middlewares.colisdirect-cors-headers-staging.headers.accesscontrolallowheaders=Content-Type,Authorization,X-Requested-With
+      - traefik.http.middlewares.colisdirect-cors-headers-staging.headers.accesscontrolalloworiginlist=https://staging.colisdirect.com
+      - traefik.http.middlewares.colisdirect-cors-headers-staging.headers.accesscontrolallowcredentials=true
+      - traefik.http.middlewares.colisdirect-cors-headers-staging.headers.accesscontrolmaxage=86400
+      - traefik.http.middlewares.colisdirect-cors-headers-staging.headers.addvaryheader=true
+      # Router principal avec CORS - toutes les méthodes sauf OPTIONS
+      - traefik.http.routers.colisdirect-api-staging.middlewares=colisdirect-cors-headers-staging
+      # Router spécifique pour OPTIONS (preflight) avec priorité plus élevée
+      - traefik.http.routers.colisdirect-api-staging-options.rule=Host(`staging-api.colisdirect.com`) && Method(`OPTIONS`)
+      - traefik.http.routers.colisdirect-api-staging-options.entrypoints=websecure
+      - traefik.http.routers.colisdirect-api-staging-options.tls=true
+      - traefik.http.routers.colisdirect-api-staging-options.tls.certresolver=mytlschallenge
+      - traefik.http.routers.colisdirect-api-staging-options.service=colisdirect-api-staging
+      - traefik.http.routers.colisdirect-api-staging-options.middlewares=colisdirect-cors-headers-staging
+      - traefik.http.routers.colisdirect-api-staging-options.priority=10
+
+  # ===========================================================================
+  # Colis Direct Frontend Staging
+  # ===========================================================================
+  colisdirect-frontend:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_STAGING_API_URL:-https://staging-api.colisdirect.com/api}
+    container_name: colisdirect-frontend-staging
+    env_file:
+      - .env.staging
+    depends_on:
+      - colisdirect-backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5173"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - traefik_network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.colisdirect-frontend-staging.rule=Host(`staging.colisdirect.com`)
+      - traefik.http.routers.colisdirect-frontend-staging.entrypoints=websecure
+      - traefik.http.routers.colisdirect-frontend-staging.tls=true
+      - traefik.http.routers.colisdirect-frontend-staging.tls.certresolver=mytlschallenge
+      - traefik.http.services.colisdirect-frontend-staging.loadbalancer.server.port=5173
+      - traefik.http.routers.colisdirect-frontend-staging.priority=100
+
+  # ===========================================================================
+  # Colis Direct Database Staging (PostgreSQL)
+  # ===========================================================================
+  colisdirect-db-staging:
+    image: postgres:15-alpine
+    container_name: colisdirect-db-staging
+    env_file:
+      - .env.staging
+    environment:
+      - POSTGRES_USER=${COLISDIRECT_STAGING_DB_USER:-colisdirect_staging}
+      - POSTGRES_PASSWORD=${COLISDIRECT_STAGING_DB_PASSWORD:-colisdirect_staging_password}
+      - POSTGRES_DB=${COLISDIRECT_STAGING_DB_NAME:-colisdirect_staging_db}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - colisdirect_postgres_data_staging:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${COLISDIRECT_STAGING_DB_USER:-colisdirect_staging} -d ${COLISDIRECT_STAGING_DB_NAME:-colisdirect_staging_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - colisdirect_internal_staging
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  traefik_network:
+    external: true
+  colisdirect_internal_staging:
+    internal: true
+    driver: bridge
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  colisdirect_postgres_data_staging:
+

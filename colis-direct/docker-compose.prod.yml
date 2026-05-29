@@ -1,0 +1,170 @@
+# =============================================================================
+# DOCKER COMPOSE - Colis Direct PRODUCTION
+# =============================================================================
+# Configuration indépendante pour l'environnement de production
+# Utilisation:
+#   - Démarrer:  docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+#   - Arrêter:   docker compose -f docker-compose.prod.yml down
+#   - Logs:      docker compose -f docker-compose.prod.yml logs -f
+#   - Rebuild:   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+# Le nom de projet est fixé ci-dessous — pas besoin de --project-name
+# =============================================================================
+
+name: colis-direct
+
+services:
+  # ===========================================================================
+  # Colis Direct Backend
+  # ===========================================================================
+  colisdirect-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: colisdirect-backend
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - RUN_MIGRATIONS=true
+      - DATABASE_URL=postgresql://${COLISDIRECT_DB_USER:-colisdirect}:${COLISDIRECT_DB_PASSWORD:-colisdirect_password}@colisdirect-db:5432/${COLISDIRECT_DB_NAME:-colisdirect_db}
+      - DB_HOST=colisdirect-db
+      - DB_PORT=5432
+      # Mapping pour que le backend trouve les variables (connection.ts cherche DB_NAME/DB_USER/DB_PASSWORD ou COLISDIRECT_DB_*)
+      - DB_NAME=${COLISDIRECT_DB_NAME:-colisdirect_db}
+      - DB_USER=${COLISDIRECT_DB_USER:-colisdirect}
+      - DB_PASSWORD=${COLISDIRECT_DB_PASSWORD:-colisdirect_password}
+      - JWT_SECRET=${COLISDIRECT_JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - PAYSTACK_SECRET_KEY=${PAYSTACK_SECRET_KEY}
+      - CINETPAY_API_KEY=${CINETPAY_API_KEY}
+      - CINETPAY_SITE_ID=${CINETPAY_SITE_ID}
+      - CINETPAY_BASE_URL=https://api-checkout.cinetpay.com/v2
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_SECURE=${SMTP_SECURE:-false}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - EMAIL_FROM=${EMAIL_FROM}
+      - FRONTEND_URL=https://colisdirect.com
+      - BACKEND_URL=https://api.colisdirect.com
+    volumes:
+      - ./database/migrations:/app/database/migrations:ro
+    depends_on:
+      colisdirect-db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - traefik_network
+      - colisdirect_internal
+    labels:
+      - traefik.enable=true
+      # Service definition
+      - traefik.http.services.colisdirect-api.loadbalancer.server.port=3001
+      # CORS Headers middleware
+      - traefik.http.middlewares.colisdirect-cors-headers.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,OPTIONS,PATCH
+      - traefik.http.middlewares.colisdirect-cors-headers.headers.accesscontrolallowheaders=Content-Type,Authorization,X-Requested-With
+      - traefik.http.middlewares.colisdirect-cors-headers.headers.accesscontrolalloworiginlist=https://colisdirect.com,https://www.colisdirect.com
+      - traefik.http.middlewares.colisdirect-cors-headers.headers.accesscontrolallowcredentials=true
+      - traefik.http.middlewares.colisdirect-cors-headers.headers.accesscontrolmaxage=86400
+      - traefik.http.middlewares.colisdirect-cors-headers.headers.addvaryheader=true
+      # Router principal pour toutes les méthodes sauf OPTIONS
+      - traefik.http.routers.colisdirect-api.rule=Host(`api.colisdirect.com`) && !Method(`OPTIONS`)
+      - traefik.http.routers.colisdirect-api.entrypoints=websecure
+      - traefik.http.routers.colisdirect-api.tls=true
+      - traefik.http.routers.colisdirect-api.tls.certresolver=mytlschallenge
+      - traefik.http.routers.colisdirect-api.service=colisdirect-api
+      - traefik.http.routers.colisdirect-api.middlewares=colisdirect-cors-headers
+      # Router spécifique pour OPTIONS (preflight) avec priorité plus élevée
+      - traefik.http.routers.colisdirect-api-options.rule=Host(`api.colisdirect.com`) && Method(`OPTIONS`)
+      - traefik.http.routers.colisdirect-api-options.entrypoints=websecure
+      - traefik.http.routers.colisdirect-api-options.tls=true
+      - traefik.http.routers.colisdirect-api-options.tls.certresolver=mytlschallenge
+      - traefik.http.routers.colisdirect-api-options.service=colisdirect-api
+      - traefik.http.routers.colisdirect-api-options.middlewares=colisdirect-cors-headers
+      - traefik.http.routers.colisdirect-api-options.priority=10
+
+  # ===========================================================================
+  # Colis Direct Frontend
+  # ===========================================================================
+  colisdirect-frontend:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-https://api.colisdirect.com/api}
+    container_name: colisdirect-frontend
+    env_file:
+      - .env.production
+    depends_on:
+      - colisdirect-backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5173"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - traefik_network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.colisdirect-frontend.rule=Host(`colisdirect.com`) || Host(`www.colisdirect.com`)
+      - traefik.http.routers.colisdirect-frontend.entrypoints=websecure
+      - traefik.http.routers.colisdirect-frontend.tls=true
+      - traefik.http.routers.colisdirect-frontend.tls.certresolver=mytlschallenge
+      - traefik.http.services.colisdirect-frontend.loadbalancer.server.port=5173
+
+  # ===========================================================================
+  # Colis Direct Database (PostgreSQL)
+  # ===========================================================================
+  colisdirect-db:
+    image: postgres:15-alpine
+    container_name: colisdirect-db
+    env_file:
+      - .env.production
+    environment:
+      - POSTGRES_USER=${COLISDIRECT_DB_USER:-colisdirect}
+      - POSTGRES_PASSWORD=${COLISDIRECT_DB_PASSWORD:-colisdirect_password}
+      - POSTGRES_DB=${COLISDIRECT_DB_NAME:-colisdirect_db}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - colisdirect_postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${COLISDIRECT_DB_USER:-colisdirect} -d ${COLISDIRECT_DB_NAME:-colisdirect_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - colisdirect_internal
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  # Réseau externe partagé avec Traefik (reverse proxy)
+  traefik_network:
+    external: true
+  # Réseau interne isolé pour la base de données
+  colisdirect_internal:
+    internal: true
+    driver: bridge
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  colisdirect_postgres_data:
+    # Réutiliser le volume existant de l'ancienne configuration
+    name: root_colisdirect_postgres_data
+    external: true

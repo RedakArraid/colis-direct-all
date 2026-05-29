@@ -1,0 +1,80 @@
+services:
+  # Base de données Postgres pour le dev local
+  postgres:
+    image: postgres:15-alpine
+    container_name: colisdirect-postgres-dev
+    environment:
+      # Ces variables sont utilisées par l'image Postgres au démarrage
+      POSTGRES_USER: ${DB_USER:-colisdirect}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-colisdirect_password}
+      POSTGRES_DB: ${DB_NAME:-colisdirect_db}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      # Expose la base sur le host pour debug: localhost:5434 → 5432 dans le conteneur
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-colisdirect} -d ${DB_NAME:-colisdirect_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Backend Node/Express
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: colisdirect-backend-dev
+    environment:
+      # Ces valeurs peuvent être surchargées par docker-compose.dev.yml
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-colisdirect_db}
+      DB_USER: ${DB_USER:-colisdirect}
+      DB_PASSWORD: ${DB_PASSWORD:-colisdirect_password}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      NODE_ENV: ${NODE_ENV:-production}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+      PORT: 3001
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      BACKEND_URL: ${BACKEND_URL:-http://localhost:3001}
+      PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
+      CINETPAY_API_KEY: ${CINETPAY_API_KEY:-}
+      CINETPAY_SITE_ID: ${CINETPAY_SITE_ID:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@colisdirect.com}
+      SUPPORT_EMAIL: ${SUPPORT_EMAIL:-support@colisdirect.com}
+      COMPANY_EMAIL: ${COMPANY_EMAIL:-contact@colisdirect.com}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # Les volumes spécifiques dev (code + node_modules) sont définis dans docker-compose.dev.yml
+      - ./database/migrations:/app/database/migrations
+
+  # Frontend React/Vite
+  frontend:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+      args:
+        # Valeur par défaut pour les builds; surchargée en dev par VITE_API_URL dans docker-compose.dev.yml
+        VITE_API_URL: http://localhost:3001/api
+    container_name: colisdirect-frontend-dev
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  backend_node_modules:
+  frontend_node_modules:
+
+

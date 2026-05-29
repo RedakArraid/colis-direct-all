@@ -1,0 +1,188 @@
+import express from 'express';
+import { pool } from '../db/connection';
+import { authenticate, AuthRequest } from '../middleware/auth';
+
+const router = express.Router();
+
+// Get all sender addresses for current user
+router.get('/', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM sender_addresses WHERE user_id = $1 ORDER BY is_default DESC, created_at DESC',
+      [req.user!.id]
+    );
+    res.json(result.rows);
+  } catch (error: any) {
+    console.error('Get sender addresses error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get default sender address
+router.get('/default', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM sender_addresses WHERE user_id = $1 AND is_default = true LIMIT 1',
+      [req.user!.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'No default address found' });
+    }
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Get default sender address error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create sender address
+router.post('/', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const {
+      label,
+      first_name,
+      last_name,
+      email,
+      phone,
+      commune,
+      quartier,
+      address,
+      is_default = false,
+    } = req.body;
+
+    // Check if this is the first address for this user
+    const countResult = await pool.query(
+      'SELECT COUNT(*) as count FROM sender_addresses WHERE user_id = $1',
+      [req.user!.id]
+    );
+    const addressCount = parseInt(countResult.rows[0].count, 10);
+    
+    // If this is the first address, make it default automatically
+    const shouldBeDefault = addressCount === 0 || is_default;
+
+    const result = await pool.query(
+      `INSERT INTO sender_addresses (
+        user_id, label, first_name, last_name, email, phone,
+        commune, quartier, address, is_default
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING *`,
+      [
+        req.user!.id,
+        label,
+        first_name,
+        last_name,
+        email || null,
+        phone,
+        commune,
+        quartier,
+        address,
+        shouldBeDefault,
+      ]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Create sender address error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update sender address
+router.patch('/:id', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      label,
+      first_name,
+      last_name,
+      email,
+      phone,
+      commune,
+      quartier,
+      address,
+      is_default,
+    } = req.body;
+
+    // Verify ownership
+    const checkResult = await pool.query(
+      'SELECT user_id FROM sender_addresses WHERE id = $1',
+      [id]
+    );
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Address not found' });
+    }
+    if (checkResult.rows[0].user_id !== req.user!.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const result = await pool.query(
+      `UPDATE sender_addresses SET
+        label = COALESCE($1, label),
+        first_name = COALESCE($2, first_name),
+        last_name = COALESCE($3, last_name),
+        email = COALESCE($4, email),
+        phone = COALESCE($5, phone),
+        commune = COALESCE($6, commune),
+        quartier = COALESCE($7, quartier),
+        address = COALESCE($8, address),
+        is_default = COALESCE($9, is_default),
+        updated_at = now()
+      WHERE id = $10 AND user_id = $11
+      RETURNING *`,
+      [
+        label,
+        first_name,
+        last_name,
+        email,
+        phone,
+        commune,
+        quartier,
+        address,
+        is_default,
+        id,
+        req.user!.id,
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Address not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Update sender address error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete sender address
+router.delete('/:id', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verify ownership
+    const checkResult = await pool.query(
+      'SELECT user_id FROM sender_addresses WHERE id = $1',
+      [id]
+    );
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Address not found' });
+    }
+    if (checkResult.rows[0].user_id !== req.user!.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    await pool.query('DELETE FROM sender_addresses WHERE id = $1 AND user_id = $2', [
+      id,
+      req.user!.id,
+    ]);
+
+    res.json({ message: 'Address deleted successfully' });
+  } catch (error: any) {
+    console.error('Delete sender address error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+export default router;
+

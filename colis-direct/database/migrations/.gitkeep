@@ -1,0 +1,3 @@
+# Ce fichier assure que le dossier migrations est versionné même s'il est vide
+# Toutes les migrations avec timestamp doivent être conservées
+

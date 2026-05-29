@@ -1,0 +1,85 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --cd-orange: #FF6C00;
+    --cd-orange-hover: #E66100;
+    --cd-orange-soft: #FFF3E8;
+    --cd-ink: #1A1A1A;
+    --cd-ink2: #3A3A3A;
+    --cd-muted: #6B7280;
+    --cd-line: #E6E6E6;
+    --cd-bg-soft: #F6F7F9;
+    --cd-dark: #0f0f0f;
+    --cd-green: #16A34A;
+    --cd-green-soft: #E6F6EC;
+  }
+
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    font-family: 'Inter', 'SF Pro Text', -apple-system, system-ui, sans-serif;
+    color: var(--cd-ink);
+    background: #fff;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', 'SF Pro Display', -apple-system, system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-[#FF6C00] text-white font-bold px-6 py-3 rounded-xl transition-all hover:bg-[#E66100] active:scale-[0.98] shadow-sm;
+  }
+  .btn-outline {
+    @apply bg-white text-[#1A1A1A] border-2 border-[#1A1A1A] font-bold px-6 py-3 rounded-xl transition-all hover:bg-gray-50 active:scale-[0.98];
+  }
+  .btn-white-outline {
+    @apply bg-transparent text-white border-2 border-white font-bold px-6 py-3 rounded-xl transition-all hover:bg-white/10 active:scale-[0.98];
+  }
+  .card {
+    @apply bg-white rounded-2xl border border-[#E6E6E6] shadow-card;
+  }
+  .nav-link {
+    @apply text-sm font-medium text-[#3A3A3A] hover:text-[#FF6C00] transition-colors;
+  }
+  .nav-link-active {
+    @apply text-sm font-bold text-[#FF6C00];
+  }
+  .section-title {
+    @apply text-3xl sm:text-4xl font-extrabold tracking-tight text-[#1A1A1A];
+  }
+  .trust-icon {
+    @apply w-11 h-11 rounded-xl bg-[#FFF3E8] flex items-center justify-center flex-shrink-0;
+  }
+  .input-field {
+    @apply w-full border border-[#E6E6E6] rounded-xl px-4 py-3 text-sm text-[#1A1A1A] placeholder:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#FF6C00] focus:border-transparent transition-all;
+  }
+  .size-card {
+    @apply border-2 rounded-xl p-4 text-center cursor-pointer transition-all;
+  }
+  .size-card-active {
+    @apply border-[#FF6C00] bg-[#FFF3E8];
+  }
+  .size-card-inactive {
+    @apply border-[#E6E6E6] bg-white hover:border-[#FF6C00]/40;
+  }
+  .step-circle-done {
+    @apply w-8 h-8 rounded-full bg-[#FF6C00] border-2 border-[#FF6C00] text-white flex items-center justify-center text-sm font-extrabold;
+  }
+  .step-circle-active {
+    @apply w-8 h-8 rounded-full bg-[#FF6C00] border-2 border-[#FF6C00] text-white flex items-center justify-center text-sm font-extrabold;
+  }
+  .step-circle-idle {
+    @apply w-8 h-8 rounded-full bg-white border-2 border-[#E6E6E6] text-[#6B7280] flex items-center justify-center text-sm font-extrabold;
+  }
+}
