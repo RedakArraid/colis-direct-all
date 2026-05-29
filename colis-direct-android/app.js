@@ -475,7 +475,7 @@ function renderHome() {
 
         <!-- Quick Track -->
         <div class="track-card" style="margin-top:18px">
-          <div class="track-card-label" style="color:#FF6C00">${icon('search', 13, '#FF6C00')} &nbsp;Suivi rapide</div>
+          <div class="track-card-label" style="color:#ffffff">${icon('search', 13, '#ffffff')} &nbsp;Suivi rapide</div>
           <div class="track-input-row">
             <input class="track-input" id="home-track-input"
               placeholder="Ex: CD202605290001CI"

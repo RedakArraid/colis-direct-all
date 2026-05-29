@@ -1092,17 +1092,17 @@ h4 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 }
 
 .track-card {
-  background: #f9fafb;
+  background: var(--cd-orange);
   border-radius: 16px;
   padding: 16px;
   margin-top: 18px;
-  border: 1px solid var(--cd-line);
+  border: none;
 }
 
 .track-card-label {
   font-size: 12px;
   font-weight: 600;
-  color: var(--cd-orange);
+  color: #ffffff;
   margin-bottom: 10px;
 }
 
@@ -2220,16 +2220,16 @@ h4 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 /* ── Track Card (hero) ─────────────────────────────────────── */
 .track-card {
-  background: #f9fafb;
+  background: var(--cd-orange);
   border-radius: 16px;
   padding: 14px;
-  border: 1px solid var(--cd-line);
+  border: none;
   position: relative;
   z-index: 1;
 }
 .track-card-label {
   font-size: 12px;
-  color: var(--cd-orange);
+  color: #ffffff;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -2241,7 +2241,7 @@ h4 { font-size: 14px; font-weight: 600; line-height: 1.4; }
   flex: 1;
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid var(--cd-line);
+  border: none;
   font-size: 14px;
   font-family: monospace;
   background: #ffffff;
