@@ -2977,8 +2977,8 @@ function buildApp() {
     <div id="screen-tracking-detail"  class="screen"></div>
     <div id="screen-profile"          class="screen"></div>
     <div id="screen-notifications"    class="screen"></div>
-    <div id="screen-login"            class="screen fullscreen" style="background:#fff;display:flex;flex-direction:column"></div>
-    <div id="screen-create-shipment"  class="screen fullscreen" style="background:#F6F7F9;display:flex;flex-direction:column"></div>
+    <div id="screen-login"            class="screen fullscreen" style="background:#fff"></div>
+    <div id="screen-create-shipment"  class="screen fullscreen" style="background:#F6F7F9"></div>
     <div id="screen-map"              class="screen"></div>
     <div id="screen-pricing"          class="screen"></div>
     <div id="screen-about"            class="screen"></div>

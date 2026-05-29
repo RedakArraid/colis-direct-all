@@ -98,6 +98,11 @@ body {
   padding-bottom: 24px;
 }
 
+.screen.fullscreen.active {
+  display: flex;
+  flex-direction: column;
+}
+
 /* ── Sticky App Header ─────────────────────────────────────── */
 .app-header {
   position: sticky;
