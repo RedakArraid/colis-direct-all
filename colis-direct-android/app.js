@@ -1207,6 +1207,7 @@ function renderProfile() {
         <div class="profile-name">${State.user.first_name} ${State.user.last_name}</div>
         <div class="profile-email">${icon('mail', 12, 'rgba(255,255,255,0.6)')} ${State.user.email || 'Email non renseigné'}</div>
         <div class="profile-phone">${icon('phone', 12, 'rgba(255,255,255,0.6)')} ${State.user.phone || 'Téléphone non renseigné'}</div>
+      </div>
       <button onclick="showEditProfile()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:11px;padding:8px;cursor:pointer;flex-shrink:0">
         ${icon('edit', 16, 'rgba(255,255,255,0.8)')}
       </button>
