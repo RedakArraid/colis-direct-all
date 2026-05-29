@@ -1167,8 +1167,8 @@ h4 { font-size: 14px; font-weight: 600; line-height: 1.4; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 20px 8px;
+  gap: 8px;
+  padding: 12px 8px;
   cursor: pointer;
   transition: background 0.15s;
   border-radius: 0;
@@ -1177,9 +1177,9 @@ h4 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .service-item:active { background: var(--cd-bg); }
 
 .service-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 20px;
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2300,24 +2300,24 @@ h4 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .services-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  padding: 0 8px 14px;
+  padding: 0 8px 8px;
   gap: 4px;
 }
 .service-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 18px 8px;
+  gap: 8px;
+  padding: 12px 8px;
   border-radius: 18px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 .service-item:active { transform: scale(0.93); background: var(--cd-bg); }
 .service-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 20px;
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;

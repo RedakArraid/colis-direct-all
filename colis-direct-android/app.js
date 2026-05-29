@@ -495,11 +495,11 @@ function renderHome() {
       <div class="section-label" style="padding:14px 16px 6px">Services rapides</div>
       <div class="services-grid">
         <div class="service-item" id="svc-envoyer" onclick="Router.navigate('create-shipment')">
-          <div class="service-icon" style="background:#FFF3E8">${icon('package', 28, '#FF6C00')}</div>
+          <div class="service-icon" style="background:#FFF3E8">${icon('package', 24, '#FF6C00')}</div>
           <span class="service-label" style="text-align:center">Envoyer un colis</span>
         </div>
         <div class="service-item" id="svc-relais" onclick="Router.navigate('map')">
-          <div class="service-icon" style="background:#E6F6EC">${icon('mapPin', 28, '#16A34A')}</div>
+          <div class="service-icon" style="background:#E6F6EC">${icon('mapPin', 24, '#16A34A')}</div>
           <span class="service-label" style="text-align:center">Trouver un relais</span>
         </div>
       </div>
