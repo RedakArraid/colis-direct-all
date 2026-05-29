@@ -1094,14 +1094,14 @@ h4 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .home-greeting {
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255,255,255,0.8);
+  color: #000000;
   margin-bottom: 2px;
 }
 
 .home-name {
   font-size: 22px;
   font-weight: 800;
-  color: #fff;
+  color: #000000;
   letter-spacing: -0.5px;
 }
 
@@ -2244,8 +2244,8 @@ h4 { font-size: 14px; font-weight: 600; line-height: 1.4; }
   background: rgba(0,0,0,0.06);
   border-radius: 50%;
 }
-.home-greeting { font-size: 14px; color: rgba(255,255,255,0.85); font-weight: 500; }
-.home-name { font-size: 22px; font-weight: 900; color: #fff; letter-spacing: -0.5px; }
+.home-greeting { font-size: 14px; color: #000000; font-weight: 500; }
+.home-name { font-size: 22px; font-weight: 900; color: #000000; letter-spacing: -0.5px; }
 
 /* ── Track Card (hero) ─────────────────────────────────────── */
 .track-card {
