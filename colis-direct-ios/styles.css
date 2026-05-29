@@ -1207,7 +1207,8 @@ h4 { font-size: 14px; font-weight: 600; line-height: 1.4; }
   padding: 14px;
   cursor: pointer;
   transition: all 0.15s;
-  min-width: 200px;
+  min-width: 310px;
+  max-width: 310px;
 }
 
 .pkg-card:active { transform: scale(0.97); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
@@ -2182,8 +2183,8 @@ h4 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 /* ── Package Card ──────────────────────────────────────────── */
 .pkg-card {
-  min-width: 230px;
-  max-width: 240px;
+  min-width: 310px;
+  max-width: 310px;
   background: #fff;
   border-radius: 18px;
   padding: 14px;

@@ -94,18 +94,12 @@ export default function BatchDispatchManagement() {
 
   const loadConfig = async () => {
     setConfigLoading(true);
-    const { data } = await api.getAdminBatches({ limit: 1 });
-    // Load config from admin settings
     try {
-      const res = await fetch('/api/admin/settings', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
-      });
-      if (res.ok) {
-        const settings = await res.json();
-        if (settings.batchDispatch) {
-          setConfig(settings.batchDispatch);
-          setConfigDraft(settings.batchDispatch);
-        }
+      const { data } = await api.getAdminSettings();
+      const bd = (data as any)?.batchDispatch;
+      if (bd) {
+        setConfig(bd);
+        setConfigDraft(bd);
       }
     } catch { /* non critique */ }
     setConfigLoading(false);
@@ -123,19 +117,12 @@ export default function BatchDispatchManagement() {
   const saveConfig = async () => {
     setConfigSaving(true);
     try {
-      const res = await fetch('/api/admin/settings', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
-        },
-        body: JSON.stringify({ batchDispatch: configDraft }),
-      });
-      if (res.ok) {
+      const { error } = await api.saveAdminSettings({ batchDispatch: configDraft });
+      if (!error) {
         setConfig({ ...configDraft });
         setConfigFeedback({ type: 'success', message: 'Configuration sauvegardée' });
       } else {
-        setConfigFeedback({ type: 'error', message: 'Erreur lors de la sauvegarde' });
+        setConfigFeedback({ type: 'error', message: error || 'Erreur lors de la sauvegarde' });
       }
     } catch {
       setConfigFeedback({ type: 'error', message: 'Erreur réseau' });
