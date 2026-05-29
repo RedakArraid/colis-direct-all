@@ -293,17 +293,114 @@ function getStatusBadge(status) {
   return map[status?.toUpperCase()] || { label: status || 'Inconnu', cls: 'badge-gray' };
 }
 
-function getProgressPercent(status) {
-  const map = {
-    'READY_FOR_DROP_OFF': 8, 'PAYMENT_AWAITING_VALIDATION': 8,
-    'PAYMENT_CONFIRMED_AWAITING_DROP': 12, 'PAYMENT_PENDING_AT_RELAY': 12,
-    'PICKUP_PENDING': 18, 'RELAY_ORIGIN_RECEIVED': 28, 'PAYMENT_RECEIVED_AT_RELAY': 28,
-    'CARRIER_COLLECTED': 42, 'IN_TRANSIT': 62,
-    'RELAY_FINAL_RECEIVED': 82, 'AVAILABLE_FOR_PICKUP': 92,
-    'PICKED_UP_BY_CUSTOMER': 100, 'DELIVERED': 100, 'DELIVERED_TO_CUSTOMER': 100,
-    'CANCELLED': 0, 'RETURN_TO_SENDER': 0,
+function getTrackingInfo(shipment) {
+  if (!shipment) return { steps: [], progress: 0, currentStepLabel: '', currentStepSublabel: '' };
+
+  const currentStatus = (shipment.current_status || '').toUpperCase();
+  const isHomeDelivery = !!shipment.home_delivery;
+  const isHomePickup = (shipment.pickup_method || '') === 'home_pickup';
+
+  const RELAY_STEPS = [
+    { id: 'created', label: 'Commande créée', sublabel: 'En attente de dépôt', statuses: ['READY_FOR_DROP_OFF', 'PAYMENT_AWAITING_VALIDATION', 'PAYMENT_CONFIRMED_AWAITING_DROP', 'PAYMENT_PENDING_AT_RELAY'], icon: 'package' },
+    { id: 'origin_relay', label: 'Déposé au relais', sublabel: 'Pris en charge au départ', statuses: ['RELAY_ORIGIN_RECEIVED', 'PAYMENT_RECEIVED_AT_RELAY'], icon: 'store' },
+    { id: 'transit', label: 'En transit', sublabel: 'Acheminement en cours', statuses: ['CARRIER_COLLECTED', 'IN_TRANSIT'], icon: 'truck' },
+    { id: 'dest_relay', label: 'Au relais de livraison', sublabel: 'Disponible au retrait', statuses: ['RELAY_FINAL_RECEIVED', 'AVAILABLE_FOR_PICKUP'], icon: 'store' },
+    { id: 'done', label: 'Retiré', sublabel: 'Livraison terminée', statuses: ['PICKED_UP_BY_CUSTOMER'], icon: 'checkCircle' }
+  ];
+
+  const HOME_STEPS_RELAY = [
+    { id: 'created', label: 'Commande créée', sublabel: 'En attente de dépôt', statuses: ['READY_FOR_DROP_OFF', 'PAYMENT_AWAITING_VALIDATION', 'PAYMENT_CONFIRMED_AWAITING_DROP', 'PAYMENT_PENDING_AT_RELAY'], icon: 'package' },
+    { id: 'origin_relay', label: 'Déposé au relais', sublabel: 'Pris en charge au départ', statuses: ['RELAY_ORIGIN_RECEIVED', 'PAYMENT_RECEIVED_AT_RELAY'], icon: 'store' },
+    { id: 'transit', label: 'En transit', sublabel: 'Acheminement en cours', statuses: ['CARRIER_COLLECTED', 'IN_TRANSIT'], icon: 'truck' },
+    { id: 'done', label: 'Livré à domicile', sublabel: 'Livraison terminée', statuses: ['DELIVERED', 'DELIVERED_TO_CUSTOMER'], icon: 'home' }
+  ];
+
+  const HOME_PICKUP_STEPS_RELAY = [
+    { id: 'created', label: 'Commande créée', sublabel: 'En attente de ramassage', statuses: ['PICKUP_PENDING', 'READY_FOR_DROP_OFF', 'PAYMENT_AWAITING_VALIDATION', 'PAYMENT_CONFIRMED_AWAITING_DROP'], icon: 'package' },
+    { id: 'pickup', label: 'Ramassage', sublabel: 'Collecté chez l\'expéditeur', statuses: ['CARRIER_COLLECTED'], icon: 'home' },
+    { id: 'transit', label: 'En transit', sublabel: 'En route vers le relais de livraison', statuses: ['IN_TRANSIT'], icon: 'truck' },
+    { id: 'dest_relay', label: 'Au relais de livraison', sublabel: 'Disponible au retrait', statuses: ['RELAY_FINAL_RECEIVED', 'AVAILABLE_FOR_PICKUP'], icon: 'store' },
+    { id: 'done', label: 'Retiré', sublabel: 'Livraison terminée', statuses: ['PICKED_UP_BY_CUSTOMER'], icon: 'checkCircle' }
+  ];
+
+  const HOME_STEPS_DIRECT = [
+    { id: 'created', label: 'Commande créée', sublabel: 'En attente de ramassage', statuses: ['PICKUP_PENDING', 'READY_FOR_DROP_OFF', 'PAYMENT_AWAITING_VALIDATION', 'PAYMENT_CONFIRMED_AWAITING_DROP'], icon: 'package' },
+    { id: 'pickup', label: 'Ramassage', sublabel: 'Collecté chez l\'expéditeur', statuses: ['CARRIER_COLLECTED'], icon: 'home' },
+    { id: 'transit', label: 'En transit', sublabel: 'Acheminement en cours', statuses: ['IN_TRANSIT'], icon: 'truck' },
+    { id: 'done', label: 'Livré à domicile', sublabel: 'Livraison terminée', statuses: ['DELIVERED', 'DELIVERED_TO_CUSTOMER'], icon: 'home' }
+  ];
+
+  const STEP_DONE_STATUSES = new Set([
+    'READY_FOR_DROP_OFF', 'PAYMENT_AWAITING_VALIDATION', 'PAYMENT_CONFIRMED_AWAITING_DROP', 'PAYMENT_PENDING_AT_RELAY',
+    'PICKUP_PENDING',
+    'RELAY_ORIGIN_RECEIVED',
+    'PICKED_UP_BY_CUSTOMER', 'DELIVERED', 'DELIVERED_TO_CUSTOMER',
+  ]);
+
+  let steps = RELAY_STEPS;
+  if (isHomePickup) {
+    if (isHomeDelivery) {
+      steps = HOME_STEPS_DIRECT;
+    } else {
+      steps = HOME_PICKUP_STEPS_RELAY;
+    }
+  } else {
+    if (isHomeDelivery) {
+      steps = HOME_STEPS_RELAY;
+    } else {
+      steps = RELAY_STEPS;
+    }
+  }
+
+  const idx = steps.findIndex(s => s.statuses.includes(currentStatus));
+  let activeStep = 1;
+  if (idx === -1) {
+    activeStep = 1;
+  } else {
+    activeStep = STEP_DONE_STATUSES.has(currentStatus) ? idx + 1 : idx;
+  }
+
+  if (activeStep > steps.length) activeStep = steps.length;
+  if (activeStep < 1) activeStep = 1;
+
+  const progress = Math.round((activeStep / steps.length) * 100);
+
+  const timelineSteps = steps.map((step, i) => {
+    let statusClass = 'pending';
+    if (i < activeStep) {
+      statusClass = 'done';
+    } else if (i === activeStep) {
+      statusClass = 'active';
+    }
+
+    return {
+      ...step,
+      status: statusClass,
+      time: shipment.events?.find(e => step.statuses.includes(e.status?.toUpperCase()))?.timestamp
+        ? formatDateTime(shipment.events.find(e => step.statuses.includes(e.status?.toUpperCase())).timestamp)
+        : null
+    };
+  });
+
+  const activeStepObj = steps[Math.min(activeStep, steps.length - 1)];
+  const currentStepLabel = activeStepObj ? activeStepObj.label : '';
+  let currentStepSublabel = activeStepObj ? activeStepObj.sublabel : '';
+  if (currentStatus === 'RELAY_FINAL_RECEIVED') {
+    currentStepSublabel = 'Arrivé au relais, mise à disposition en cours';
+  }
+
+  return {
+    steps: timelineSteps,
+    progress: progress,
+    currentStepLabel,
+    currentStepSublabel
   };
-  return map[status?.toUpperCase()] ?? 0;
+}
+
+function getProgressPercent(shipment) {
+  if (!shipment) return 0;
+  const sObj = typeof shipment === 'string' ? { current_status: shipment } : shipment;
+  return getTrackingInfo(sObj).progress;
 }
 
 function getStatusLabel(status) {
@@ -603,7 +700,7 @@ function openSupport() {
 
 function renderPackageCard(s) {
   const badge = getStatusBadge(s.current_status);
-  const progress = getProgressPercent(s.current_status);
+  const progress = getProgressPercent(s);
   return `
     <div class="pkg-card" onclick="showShipmentDetail('${s.id}')">
       <div class="pkg-card-header">
@@ -731,7 +828,7 @@ function filterShipments(q) {
 
 function renderShipmentListItem(s) {
   const badge = getStatusBadge(s.current_status);
-  const progress = getProgressPercent(s.current_status);
+  const progress = getProgressPercent(s);
   const bgColor = { 'badge-green': '#E6F6EC', 'badge-orange': '#FFF3E8', 'badge-blue': '#EEF4FF', 'badge-red': '#FEF2F2', 'badge-yellow': '#FEF8E7' }[badge.cls] || '#F6F7F9';
   const fgColor = { 'badge-green': '#16A34A', 'badge-orange': '#FF6C00', 'badge-blue': '#2F6BE0', 'badge-red': '#DC2626', 'badge-yellow': '#B45309' }[badge.cls] || '#6B7280';
   return `
@@ -843,7 +940,7 @@ async function doTrack() {
   if (found) {
     State.trackingResult = found;
     const badge = getStatusBadge(found.current_status);
-    const progress = getProgressPercent(found.current_status);
+    const progress = getProgressPercent(found);
     resultZone.innerHTML = `
       <div class="card" style="border-radius:18px;overflow:hidden;animation:slideUp 0.35s ease">
         <div style="background:linear-gradient(135deg,#FF6C00,#FF8533);padding:16px">
@@ -904,8 +1001,9 @@ function renderTrackingDetail(shipment) {
   if (!el) return;
 
   const badge = getStatusBadge(shipment.current_status);
-  const progress = getProgressPercent(shipment.current_status);
-  const steps = getTrackingSteps(shipment);
+  const trackingInfo = getTrackingInfo(shipment);
+  const progress = trackingInfo.progress;
+  const steps = trackingInfo.steps;
   const isDelivered = ['PICKED_UP_BY_CUSTOMER','DELIVERED','DELIVERED_TO_CUSTOMER'].includes(shipment.current_status);
   const isCancelled = ['CANCELLED','RETURN_TO_SENDER'].includes(shipment.current_status);
 
@@ -979,6 +1077,17 @@ function renderTrackingDetail(shipment) {
           `;
         }).join('')}
       </div>
+
+      <!-- Current step banner -->
+      ${!isCancelled ? `
+        <div style="margin-top:16px;background:#FFF3E8;border:1px solid #FFD4A8;border-radius:12px;padding:12px;display:flex;align-items:center;gap:10px">
+          <div style="width:8px;height:8px;border-radius:50%;background:#FF6C00;flex-shrink:0;animation:pulse-ring 1.4s ease-out infinite"></div>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#FF6C00">Étape actuelle : ${trackingInfo.currentStepLabel}</div>
+            <div style="font-size:11px;color:#B45309;margin-top:2px">${trackingInfo.currentStepSublabel}</div>
+          </div>
+        </div>
+      ` : ''}
     </div>
 
     <div class="divider-soft"></div>
@@ -1756,7 +1865,7 @@ function renderCreateShipment() {
   const el = document.getElementById('screen-create-shipment');
   if (!el) return;
 
-  const stepTitles = ['', 'Informations', 'Livraison', 'Récapitulatif'];
+  const stepTitles = ['', 'Informations', 'Mode', 'Points relais', 'Récapitulatif'];
 
   el.innerHTML = `
     <div class="app-header">
@@ -1771,7 +1880,7 @@ function renderCreateShipment() {
 
     <!-- Stepper -->
     <div class="stepper-labels" style="display:flex;justify-content:space-between;padding:12px 16px 8px;border-bottom:1px solid #E6E6E6;background:#fff">
-      ${['Informations', 'Livraison', 'Récap'].map((lbl, idx) => {
+      ${['Informations', 'Mode', 'Points relais', 'Récap'].map((lbl, idx) => {
         const s = idx + 1;
         const active = s === createStep;
         const done = s < createStep;
@@ -1787,7 +1896,7 @@ function renderCreateShipment() {
               </div>
               <div style="font-size:10px;font-weight:${active ? '700' : '500'};color:${active ? '#FF6C00' : done ? '#1A1A1A' : '#9CA3AF'};margin-top:4px;white-space:nowrap">${lbl}</div>
             </div>
-            ${idx < 2 ? `<div style="flex:1;height:2px;margin:0 8px 16px;background:${done ? '#FF6C00' : '#E6E6E6'}"></div>` : ''}
+            ${idx < 3 ? `<div style="flex:1;height:2px;margin:0 8px 16px;background:${done ? '#FF6C00' : '#E6E6E6'}"></div>` : ''}
           </div>
         `;
       }).join('')}
@@ -1795,12 +1904,12 @@ function renderCreateShipment() {
 
     <!-- Content -->
     <div id="cs-content" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px">
-      ${createStep === 1 ? stepInformations() : createStep === 2 ? stepDeliveryMode() : stepSummary()}
+      ${createStep === 1 ? stepInformations() : createStep === 2 ? stepDeliveryMode() : createStep === 3 ? stepRelaySelection() : stepSummary()}
     </div>
 
     <!-- Footer CTA -->
     <div style="padding:12px 16px;background:#fff;border-top:1px solid #E6E6E6;flex-shrink:0">
-      ${createStep < 3
+      ${createStep < 4
         ? `<button class="btn btn-primary btn-full" onclick="nextStep()">Continuer ${icon('arrowRight', 18)}</button>`
         : `<button class="btn btn-primary btn-full" onclick="submitShipment()">${icon('checkCircle', 18)} Confirmer l'envoi</button>`
       }
@@ -2126,6 +2235,81 @@ function selectRecipientFromBook(addrId) {
   Toast.show(`✓ ${addr.first_name} ${addr.last_name} sélectionné !`, 'success');
 }
 
+function stepRelaySelection() {
+  const showOrigin = createData.pickup_method === 'relay_deposit';
+  const showDest = !createData.home_delivery;
+
+  const senderCommune = createData.sender_commune || '';
+  const recipientCommune = createData.recipient_commune || '';
+
+  const matchedOrigin = DEMO_RELAY_POINTS.find(r => r.commune.toLowerCase().includes(senderCommune.toLowerCase())) || DEMO_RELAY_POINTS[0];
+  const matchedDest = DEMO_RELAY_POINTS.find(r => r.commune.toLowerCase().includes(recipientCommune.toLowerCase())) || DEMO_RELAY_POINTS[4] || DEMO_RELAY_POINTS[0];
+
+  if (showOrigin && !createData.origin_relay_id) {
+    createData.origin_relay_id = matchedOrigin.id;
+  }
+  if (showDest && !createData.destination_relay_id) {
+    createData.destination_relay_id = matchedDest.id;
+  }
+
+  const originRelay = DEMO_RELAY_POINTS.find(r => r.id === createData.origin_relay_id) || matchedOrigin;
+  const destRelay = DEMO_RELAY_POINTS.find(r => r.id === createData.destination_relay_id) || matchedDest;
+
+  return `
+    <div style="font-size:14px;font-weight:700;color:#FF6C00;margin-bottom:8px">Sélection des points relais</div>
+
+    ${showOrigin ? `
+      <div style="background:#F6F7F9;border-radius:16px;padding:16px;margin-bottom:14px">
+        <div style="font-size:15px;font-weight:800;color:#1A1A1A;margin-bottom:4px;display:flex;align-items:center;gap:6px">
+          ${icon('store', 18, '#FF6C00')} Relais de départ
+        </div>
+        <div style="font-size:12px;color:#6B7280;margin-bottom:12px">Où souhaitez-vous déposer votre colis ?</div>
+        
+        <div class="form-group" style="margin-bottom:12px">
+          <select class="form-input" id="c-origin-relay-select" onchange="createData.origin_relay_id=this.value;document.getElementById('cs-content').innerHTML=stepRelaySelection()" style="font-weight:700;color:#1A1A1A;border-color:#FF6C00">
+            ${DEMO_RELAY_POINTS.map(r => `
+              <option value="${r.id}" ${r.id === originRelay.id ? 'selected' : ''}>${r.name} (${r.commune})</option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div style="background:#fff;border-radius:12px;padding:12px;border:1px solid #E6E6E6;margin-top:8px">
+          <div style="font-size:13px;font-weight:700;color:#1A1A1A">${originRelay.name}</div>
+          <div style="font-size:12px;color:#6B7280;margin-top:2px">${originRelay.address}</div>
+          <div style="font-size:11px;color:#FF6C00;margin-top:4px;font-weight:600;display:flex;align-items:center;gap:4px">
+            ${icon('clock', 12, '#FF6C00')} ${originRelay.hours}
+          </div>
+        </div>
+      </div>
+    ` : ''}
+
+    ${showDest ? `
+      <div style="background:#F6F7F9;border-radius:16px;padding:16px">
+        <div style="font-size:15px;font-weight:800;color:#1A1A1A;margin-bottom:4px;display:flex;align-items:center;gap:6px">
+          ${icon('store', 18, '#FF6C00')} Relais de livraison
+        </div>
+        <div style="font-size:12px;color:#6B7280;margin-bottom:12px">Où le destinataire retirera-t-il le colis ?</div>
+        
+        <div class="form-group" style="margin-bottom:12px">
+          <select class="form-input" id="c-dest-relay-select" onchange="createData.destination_relay_id=this.value;document.getElementById('cs-content').innerHTML=stepRelaySelection()" style="font-weight:700;color:#1A1A1A;border-color:#FF6C00">
+            ${DEMO_RELAY_POINTS.map(r => `
+              <option value="${r.id}" ${r.id === destRelay.id ? 'selected' : ''}>${r.name} (${r.commune})</option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div style="background:#fff;border-radius:12px;padding:12px;border:1px solid #E6E6E6;margin-top:8px">
+          <div style="font-size:13px;font-weight:700;color:#1A1A1A">${destRelay.name}</div>
+          <div style="font-size:12px;color:#6B7280;margin-top:2px">${destRelay.address}</div>
+          <div style="font-size:11px;color:#FF6C00;margin-top:4px;font-weight:600;display:flex;align-items:center;gap:4px">
+            ${icon('clock', 12, '#FF6C00')} ${destRelay.hours}
+          </div>
+        </div>
+      </div>
+    ` : ''}
+  `;
+}
+
 function stepSummary() {
   const isIntra = createData.sender_commune === createData.recipient_commune;
   let basePrice = 0;
@@ -2237,6 +2421,11 @@ function nextStep() {
     createData.recipient_quartier = document.getElementById('r-quartier')?.value?.trim();
     createData.recipient_address = document.getElementById('r-address')?.value?.trim();
     createData.recipient_repere = document.getElementById('r-repere')?.value?.trim();
+
+    const weightVal = parseFloat(document.getElementById('c-weight')?.value);
+    if (!isNaN(weightVal)) createData.weight = weightVal;
+    if (!createData.grid_type) createData.grid_type = 'colis';
+    if (!createData.package_type) createData.package_type = 'petit';
     
     if (!createData.sender_first_name || !createData.sender_last_name || !createData.sender_phone || !createData.sender_commune || !createData.sender_quartier || !createData.sender_address ||
         !createData.recipient_first_name || !createData.recipient_last_name || !createData.recipient_phone || !createData.recipient_commune || !createData.recipient_quartier || !createData.recipient_address) {
@@ -2244,24 +2433,44 @@ function nextStep() {
     }
   } else if (createStep === 2) {
     createData.description = document.getElementById('c-desc')?.value?.trim();
-    const weightVal = parseFloat(document.getElementById('c-weight')?.value);
-    if (!isNaN(weightVal)) createData.weight = weightVal;
-    
-    if (!createData.grid_type) createData.grid_type = 'colis';
-    if (!createData.package_type) createData.package_type = 'moyen';
     if (!createData.pickup_method) createData.pickup_method = 'relay_deposit';
     if (createData.home_delivery === undefined) createData.home_delivery = false;
     if (createData.is_fragile === undefined) createData.is_fragile = false;
     if (createData.is_insured === undefined) createData.is_insured = false;
     if (!createData.payment_method) createData.payment_method = 'paystack';
+
+    // If home pickup AND home delivery, skip relay selection step
+    if (createData.pickup_method === 'home_pickup' && createData.home_delivery === true) {
+      createStep = 4;
+      renderCreateShipment();
+      return;
+    }
+  } else if (createStep === 3) {
+    const originSel = document.getElementById('c-origin-relay-select');
+    const destSel = document.getElementById('c-dest-relay-select');
+    if (originSel) createData.origin_relay_id = originSel.value;
+    if (destSel) createData.destination_relay_id = destSel.value;
   }
   createStep++;
   renderCreateShipment();
 }
 
 function prevStep() {
-  if (createStep > 1) { createStep--; renderCreateShipment(); }
-  else Router.back();
+  if (createStep === 4) {
+    if (createData.pickup_method === 'home_pickup' && createData.home_delivery === true) {
+      createStep = 2;
+    } else {
+      createStep = 3;
+    }
+  } else if (createStep === 3) {
+    createStep = 2;
+  } else if (createStep === 2) {
+    createStep = 1;
+  } else {
+    Router.back();
+    return;
+  }
+  renderCreateShipment();
 }
 
 async function submitShipment() {
@@ -2306,6 +2515,12 @@ async function submitShipment() {
     created_at: new Date().toISOString(),
     events: [{ status: 'READY_FOR_DROP_OFF', timestamp: new Date().toISOString(), notes: 'Commande créée et paiement validé' }],
   };
+  if (createData.pickup_method === 'relay_deposit') {
+    newS.origin_relay = DEMO_RELAY_POINTS.find(r => r.id === createData.origin_relay_id) || DEMO_RELAY_POINTS[0];
+  }
+  if (!createData.home_delivery) {
+    newS.destination_relay = DEMO_RELAY_POINTS.find(r => r.id === createData.destination_relay_id) || DEMO_RELAY_POINTS[4] || DEMO_RELAY_POINTS[0];
+  }
   DEMO_SHIPMENTS.unshift(newS);
 
   // Notification
