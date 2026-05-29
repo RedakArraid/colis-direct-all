@@ -1888,12 +1888,12 @@ function stepInformations() {
             <input class="form-input" id="s-lname" placeholder="Diallo" value="${createData.sender_last_name || ''}" /></div>
           <div class="form-group"><label class="form-label">Prénom *</label>
             <input class="form-input" id="s-fname" placeholder="Kader" value="${createData.sender_first_name || ''}" /></div>
-          <div class="form-group"><label class="form-label">Email</label>
+          <div class="form-group" style="grid-column:1/-1"><label class="form-label">Email</label>
             <input class="form-input" id="s-email" placeholder="votre@email.com" value="${createData.sender_email || ''}" /></div>
-          <div class="form-group"><label class="form-label">Téléphone *</label>
-            <div style="display:flex;gap:6px">
-              <select class="form-select" style="width:80px;flex-shrink:0;padding:10px 6px;font-size:12px"><option>🇨🇮 +225</option></select>
-              <input class="form-input" id="s-phone" type="tel" placeholder="07 00 00 00 00" value="${createData.sender_phone || ''}" style="flex:1" />
+          <div class="form-group" style="grid-column:1/-1"><label class="form-label">Téléphone *</label>
+            <div style="display:flex;gap:8px">
+              <select class="form-select" style="width:115px;flex-shrink:0;padding:13px 32px 13px 14px;font-size:14px;height:48px"><option>🇨🇮 +225</option></select>
+              <input class="form-input" id="s-phone" type="tel" placeholder="07 00 00 00 00" value="${createData.sender_phone || ''}" style="flex:1;height:48px" />
             </div></div>
           <div class="form-group"><label class="form-label">Commune *</label>
             <select class="form-select" id="s-commune">
@@ -1923,12 +1923,12 @@ function stepInformations() {
           <input class="form-input" id="r-lname" placeholder="Koné" value="${createData.recipient_last_name || ''}" /></div>
         <div class="form-group"><label class="form-label">Prénom *</label>
           <input class="form-input" id="r-fname" placeholder="Aminata" value="${createData.recipient_first_name || ''}" /></div>
-        <div class="form-group"><label class="form-label">Email</label>
+        <div class="form-group" style="grid-column:1/-1"><label class="form-label">Email</label>
           <input class="form-input" id="r-email" placeholder="destinataire@email.com" value="${createData.recipient_email || ''}" /></div>
-        <div class="form-group"><label class="form-label">Téléphone *</label>
-          <div style="display:flex;gap:6px">
-            <select class="form-select" style="width:80px;flex-shrink:0;padding:10px 6px;font-size:12px"><option>🇨🇮 +225</option></select>
-            <input class="form-input" id="r-phone" type="tel" placeholder="05 00 00 00 00" value="${createData.recipient_phone || ''}" style="flex:1" />
+        <div class="form-group" style="grid-column:1/-1"><label class="form-label">Téléphone *</label>
+          <div style="display:flex;gap:8px">
+            <select class="form-select" style="width:115px;flex-shrink:0;padding:13px 32px 13px 14px;font-size:14px;height:48px"><option>🇨🇮 +225</option></select>
+            <input class="form-input" id="r-phone" type="tel" placeholder="05 00 00 00 00" value="${createData.recipient_phone || ''}" style="flex:1;height:48px" />
           </div></div>
         <div class="form-group"><label class="form-label">Commune *</label>
           <select class="form-select" id="r-commune">
