@@ -495,11 +495,11 @@ function renderHome() {
       <div class="section-label" style="padding:14px 16px 6px">Services rapides</div>
       <div class="services-grid">
         <div class="service-item" id="svc-envoyer" onclick="Router.navigate('create-shipment')">
-          <div class="service-icon" style="background:#FFF3E8">${icon('package', 24, '#FF6C00')}</div>
+          <div class="service-icon" style="background:#FFF3E8">${icon('package', 28, '#FF6C00')}</div>
           <span class="service-label" style="text-align:center">Envoyer un colis</span>
         </div>
         <div class="service-item" id="svc-relais" onclick="Router.navigate('map')">
-          <div class="service-icon" style="background:#E6F6EC">${icon('mapPin', 24, '#16A34A')}</div>
+          <div class="service-icon" style="background:#E6F6EC">${icon('mapPin', 28, '#16A34A')}</div>
           <span class="service-label" style="text-align:center">Trouver un relais</span>
         </div>
       </div>
@@ -533,43 +533,7 @@ function renderHome() {
       </div>
     `}
 
-    <!-- Modes de livraison -->
-    <div style="padding:16px">
-      <h3 style="font-size:15px;font-weight:700;color:#1A1A1A;margin-bottom:12px">Modes de livraison</h3>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <div class="card" style="border:2px solid #F5B400;border-radius:16px;padding:16px;cursor:pointer" onclick="Router.navigate('create-shipment')">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
-            <div style="width:44px;height:44px;background:linear-gradient(135deg,#FFB020,#FF8A00);border-radius:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-              ${icon('home', 22, 'white')}
-            </div>
-            <div style="flex:1">
-              <div style="font-size:15px;font-weight:800;color:#1A1A1A">Livraison à domicile</div>
-              <div style="font-size:12px;color:#6B7280">Livré le jour même en zone urbaine</div>
-            </div>
-            ${icon('arrowRight', 18, '#F5B400')}
-          </div>
-          <div style="background:#FEF8E7;border-left:3px solid #F5B400;border-radius:8px;padding:9px 12px;font-size:12px;font-weight:600;color:#78350F;display:flex;align-items:center;gap:8px">
-            ${icon('zap', 13, '#F5B400')} Service rapide, votre colis arrive directement chez vous
-          </div>
-        </div>
 
-        <div class="card" style="border:2px solid #5B9BFF;border-radius:16px;padding:16px;cursor:pointer" onclick="Router.navigate('map')">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
-            <div style="width:44px;height:44px;background:linear-gradient(135deg,#4F8DF7,#2F6BE0);border-radius:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-              ${icon('store', 22, 'white')}
-            </div>
-            <div style="flex:1">
-              <div style="font-size:15px;font-weight:800;color:#1A1A1A">Livraison en point relais</div>
-              <div style="font-size:12px;color:#6B7280">+500 relais partout en Côte d'Ivoire</div>
-            </div>
-            ${icon('arrowRight', 18, '#5B9BFF')}
-          </div>
-          <div style="background:#EEF4FF;border-left:3px solid #5B9BFF;border-radius:8px;padding:9px 12px;font-size:12px;font-weight:600;color:#1E3A5F;display:flex;align-items:center;gap:8px">
-            ${icon('box', 13, '#5B9BFF')} Économique et fiable, récupérez quand vous voulez
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- Tarifs CTA -->
     <div style="padding:0 16px 16px">
