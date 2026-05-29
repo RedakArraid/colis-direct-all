@@ -535,20 +535,8 @@ function renderHome() {
 
 
 
-    <!-- Tarifs CTA -->
-    <div style="padding:0 16px 16px">
-      <div style="background:linear-gradient(135deg,#0f0f0f 0%,#1a1a2e 100%);border-radius:20px;padding:20px;text-align:center">
-        <div style="font-size:11px;font-weight:700;color:#FF6C00;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Tarifs transparents</div>
-        <div style="font-size:22px;font-weight:800;color:#fff">Dès <span style="color:#FF6C00">600 FCFA</span></div>
-        <p style="font-size:13px;color:rgba(255,255,255,0.65);margin:8px 0 16px;line-height:1.5">Envoyez partout en Côte d'Ivoire.</p>
-        <button class="btn btn-primary btn-full" onclick="Router.navigate('pricing')" style="font-size:14px;padding:12px 20px">
-          Voir tous les tarifs ${icon('arrowRight', 16)}
-        </button>
-      </div>
-    </div>
-
     <!-- Partenaires CTA -->
-    <div style="padding:0 16px 28px">
+    <div style="padding:0 16px 16px">
       <div style="background:linear-gradient(135deg,#FF6C00,#FF8533);border-radius:20px;padding:20px">
         <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.85);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px">Rejoignez-nous</div>
         <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:8px">Devenez partenaire</div>
@@ -561,6 +549,18 @@ function renderHome() {
             ${icon('store', 14, 'white')} Point relais
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- Tarifs CTA -->
+    <div style="padding:0 16px 28px">
+      <div style="background:linear-gradient(135deg,#0f0f0f 0%,#1a1a2e 100%);border-radius:20px;padding:20px;text-align:center">
+        <div style="font-size:11px;font-weight:700;color:#FF6C00;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Tarifs transparents</div>
+        <div style="font-size:22px;font-weight:800;color:#fff">Dès <span style="color:#FF6C00">600 FCFA</span></div>
+        <p style="font-size:13px;color:rgba(255,255,255,0.65);margin:8px 0 16px;line-height:1.5">Envoyez partout en Côte d'Ivoire.</p>
+        <button class="btn btn-primary btn-full" onclick="Router.navigate('pricing')" style="font-size:14px;padding:12px 20px">
+          Voir tous les tarifs ${icon('arrowRight', 16)}
+        </button>
       </div>
     </div>
   `;
