@@ -2707,7 +2707,7 @@ function stepSummary() {
   const pickupFee = createData.pickup_method === 'home_pickup' ? 500 : 0;
   const deliveryFee = createData.home_delivery ? 1000 : 0;
   const total = calculatePrice(createData.pickup_method, createData.home_delivery);
-  const payment = createData.payment_method || 'paystack';
+  const payment = createData.payment_method || 'relay_cash';
 
   return `
     <div style="font-size:14px;font-weight:700;color:#FF6C00;margin-bottom:8px">Vérifiez votre commande</div>
@@ -2759,12 +2759,18 @@ function stepSummary() {
     <!-- Paiement -->
     <div style="font-size:14px;font-weight:700;color:#1A1A1A;margin-top:4px;margin-bottom:10px">Mode de paiement</div>
     ${[
-      { id: 'paystack',   label: 'Mobile Money / Carte', desc: 'Orange, MTN, Wave, Carte bancaire', emoji: '💳' },
+      { id: 'paystack',   label: 'Mobile Money / Carte', desc: 'Orange, MTN, Wave, Carte bancaire', emoji: '💳', disabled: true },
       { id: 'relay_cash', label: 'Paiement au relais',    desc: 'Espèces lors du dépôt du colis',   emoji: '💵' },
     ].map(p => `
-      <div class="payment-pill ${payment === p.id ? 'selected' : ''}" onclick="createData.payment_method='${p.id}';document.getElementById('cs-content').innerHTML=stepSummary()">
+      <div class="payment-pill ${payment === p.id ? 'selected' : ''} ${p.disabled ? 'disabled' : ''}" ${p.disabled ? '' : `onclick="createData.payment_method='${p.id}';document.getElementById('cs-content').innerHTML=stepSummary()"`} style="${p.disabled ? 'opacity: 0.5; cursor: not-allowed;' : ''}">
         <div class="payment-pill-icon">${p.emoji}</div>
-        <div><div class="payment-pill-name">${p.label}</div><div class="payment-pill-desc">${p.desc}</div></div>
+        <div>
+          <div class="payment-pill-name" style="display:flex;align-items:center;gap:6px">
+            ${p.label}
+            ${p.disabled ? '<span style="font-size:9px;background:#E6E6E6;color:#6B7280;padding:2px 6px;border-radius:10px;font-weight:bold">Bientôt dispo</span>' : ''}
+          </div>
+          <div class="payment-pill-desc">${p.desc}</div>
+        </div>
         ${payment === p.id ? `<div style="margin-left:auto">${icon('checkCircle', 18, '#FF6C00')}</div>` : ''}
       </div>
     `).join('')}
@@ -2815,7 +2821,7 @@ function nextStep() {
     if (createData.home_delivery === undefined) createData.home_delivery = false;
     if (createData.is_fragile === undefined) createData.is_fragile = false;
     if (createData.is_insured === undefined) createData.is_insured = false;
-    if (!createData.payment_method) createData.payment_method = 'paystack';
+    if (!createData.payment_method) createData.payment_method = 'relay_cash';
 
     // If home pickup AND home delivery, skip relay selection step
     if (createData.pickup_method === 'home_pickup' && createData.home_delivery === true) {
