@@ -712,6 +712,31 @@ class ApiClient {
     return this.request<any[]>('/handoffs/transporter/delivered-shipments');
   }
 
+  // ── Espace livreur : offres de course + portefeuille ──
+  async getMyOffers() {
+    return this.request<any[]>('/delivery-offers/my-offers');
+  }
+
+  async acceptOffer(offerId: string) {
+    return this.request<any>(`/delivery-offers/${offerId}/accept`, { method: 'POST' });
+  }
+
+  async declineOffer(offerId: string) {
+    return this.request<any>(`/delivery-offers/${offerId}/decline`, { method: 'POST' });
+  }
+
+  async getTransporterWallet() {
+    return this.request<{ wallet: any; stats: { today: number; week: number; month: number } }>('/transporter/wallet');
+  }
+
+  async getWalletTransactions(limit = 20, offset = 0) {
+    return this.request<{ data: any[]; total: number }>(`/transporter/wallet/transactions?limit=${limit}&offset=${offset}`);
+  }
+
+  async requestWithdrawal(payload: { amount_fcfa: number; orange_money_number: string; notes?: string }) {
+    return this.request<any>('/transporter/wallet/withdraw', { method: 'POST', body: JSON.stringify(payload) });
+  }
+
   async findTransporterByIdentifier(identifier: string) {
     return this.request<{ transporter_id: string; user_id: string }>(`/handoffs/find-transporter/${identifier}`);
   }

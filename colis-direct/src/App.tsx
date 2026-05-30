@@ -19,8 +19,7 @@ import CreateShipmentPage from './pages/CreateShipmentPage';
 import LoginPage from './pages/LoginPage';
 import AdminDashboard from './pages/AdminDashboard';
 import RelayDashboard from './pages/RelayDashboard';
-import TransporterLoginPage from './pages/TransporterLoginPage';
-import TransporterPickupPage from './pages/TransporterPickupPage';
+import TransporterSpace from './pages/transporter/TransporterSpace';
 import ProDashboard from './pages/ProDashboard';
 import CustomerSupportDashboard from './pages/support/CustomerSupportDashboard';
 import MyProfilePage from './pages/MyProfilePage';
@@ -214,7 +213,7 @@ function AppContentWrapper() {
     if (user && user.role === 'transporter') {
       const allowedPages: PageType[] = ['transporter-login', 'transporter-pickup'];
       if (!allowedPages.includes(currentPage)) {
-        return <TransporterLoginPage onNavigate={navigate} />;
+        return <TransporterSpace />;
       }
     }
 
@@ -258,9 +257,9 @@ function AppContentWrapper() {
       case 'relay-dashboard':
         return <RelayDashboard onNavigate={navigate} />;
         case 'transporter-login':
-          return <TransporterLoginPage onNavigate={navigate} />;
+          return <TransporterSpace />;
         case 'transporter-pickup':
-          return <TransporterPickupPage />;
+          return <TransporterSpace />;
       case 'pro-dashboard':
         return <ProDashboard onNavigate={navigate} />;
       case 'support-dashboard':

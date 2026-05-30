@@ -3107,8 +3107,8 @@ function TransporterLoginPage({ onNavigate }: TransporterLoginPageProps) {
                 >
                   <MapAutoCenter center={mapCenter} zoom={mapZoom} />
                   <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributrices et contributeurs'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                    url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                   />
                   {mapMarkers.map((marker) => {
                     const stop = tourStops.find(s => s.id === marker.id);

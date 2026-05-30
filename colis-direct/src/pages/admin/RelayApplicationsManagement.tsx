@@ -31,6 +31,21 @@ interface RelayApplication {
   approved_relay_point_id?: string;
 }
 
+// Camera controller helper for Leaflet Map
+function MapCameraController({ selectedApplication, useMap }: { selectedApplication: any; useMap: any }) {
+  const map = useMap();
+  useEffect(() => {
+    if (selectedApplication?.latitude && selectedApplication?.longitude) {
+      map.flyTo(
+        [Number(selectedApplication.latitude), Number(selectedApplication.longitude)],
+        15,
+        { animate: true, duration: 1.5 }
+      );
+    }
+  }, [selectedApplication, map]);
+  return null;
+}
+
 function RelayApplicationsManagement() {
   const [applications, setApplications] = useState<RelayApplication[]>([]);
   const [filteredApplications, setFilteredApplications] = useState<RelayApplication[]>([]);
@@ -42,6 +57,24 @@ function RelayApplicationsManagement() {
   const [actionLoading, setActionLoading] = useState(false);
   const [reviewNotes, setReviewNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
+  const [MapComponents, setMapComponents] = useState<any>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([
+      import('leaflet'),
+      import('react-leaflet'),
+      import('leaflet/dist/leaflet.css'),
+    ]).then(async ([L, RL]) => {
+      if (!mounted) return;
+      const mk2x = (await import('leaflet/dist/images/marker-icon-2x.png')).default;
+      const mk = (await import('leaflet/dist/images/marker-icon.png')).default;
+      const sh = (await import('leaflet/dist/images/marker-shadow.png')).default;
+      L.Icon.Default.mergeOptions({ iconRetinaUrl: mk2x, iconUrl: mk, shadowUrl: sh });
+      setMapComponents({ L, ...RL });
+    });
+    return () => { mounted = false; };
+  }, []);
 
   useEffect(() => {
     loadApplications();
@@ -427,30 +460,92 @@ function RelayApplicationsManagement() {
                 <div>
                   <h3 className="text-sm font-semibold text-gray-700 mb-2">Position GPS</h3>
                   <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="w-full h-64 rounded-lg overflow-hidden border border-gray-300 mb-2">
-                      <iframe
-                        width="100%"
-                        height="100%"
-                        frameBorder="0"
-                        scrolling="no"
-                        marginHeight={0}
-                        marginWidth={0}
-                        src={`https://www.openstreetmap.org/export/embed.html?bbox=${Number(selectedApplication.longitude) - 0.01},${Number(selectedApplication.latitude) - 0.01},${Number(selectedApplication.longitude) + 0.01},${Number(selectedApplication.latitude) + 0.01}&layer=mapnik&marker=${selectedApplication.latitude},${selectedApplication.longitude}`}
-                      />
+                    <div className="w-full h-64 rounded-lg overflow-hidden border border-gray-300 mb-2 bg-[#F6F7F9] relative">
+                      {MapComponents ? (
+                        <MapComponents.MapContainer
+                          center={[Number(selectedApplication.latitude), Number(selectedApplication.longitude)]}
+                          zoom={15}
+                          zoomControl={true}
+                          style={{ height: '100%', width: '100%', zIndex: 1 }}
+                        >
+                          <MapComponents.TileLayer
+                            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                          />
+                          <MapCameraController
+                            selectedApplication={selectedApplication}
+                            useMap={MapComponents.useMap}
+                          />
+                          {(() => {
+                            const customIcon = MapComponents.L.divIcon({
+                              className: 'custom-leaflet-icon',
+                              html: `
+                                <div class="custom-marker active-marker" style="
+                                  display: flex;
+                                  align-items: center;
+                                  justify-content: center;
+                                  width: 36px;
+                                  height: 36px;
+                                  background: #FF6C00;
+                                  border: 2.5px solid #ffffff;
+                                  border-radius: 50%;
+                                  box-shadow: 0 4px 10px rgba(255, 108, 0, 0.4);
+                                  color: #ffffff;
+                                  position: relative;
+                                  transition: all 0.2s ease;
+                                ">
+                                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+                                  </svg>
+                                </div>
+                              `,
+                              iconSize: [36, 36],
+                              iconAnchor: [18, 18],
+                            });
+                            return (
+                              <MapComponents.Marker
+                                position={[Number(selectedApplication.latitude), Number(selectedApplication.longitude)]}
+                                icon={customIcon}
+                              />
+                            );
+                          })()}
+                        </MapComponents.MapContainer>
+                      ) : (
+                        <iframe
+                          width="100%"
+                          height="100%"
+                          frameBorder="0"
+                          scrolling="no"
+                          marginHeight={0}
+                          marginWidth={0}
+                          src={`https://www.openstreetmap.org/export/embed.html?bbox=${Number(selectedApplication.longitude) - 0.01},${Number(selectedApplication.latitude) - 0.01},${Number(selectedApplication.longitude) + 0.01},${Number(selectedApplication.latitude) + 0.01}&layer=mapnik&marker=${selectedApplication.latitude},${selectedApplication.longitude}`}
+                        />
+                      )}
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="text-xs text-gray-500">
                         GPS: {Number(selectedApplication.latitude).toFixed(6)}, {Number(selectedApplication.longitude).toFixed(6)}
                       </div>
-                      <a
-                        href={`https://www.openstreetmap.org/?mlat=${Number(selectedApplication.latitude)}&mlon=${Number(selectedApplication.longitude)}#map=16/${Number(selectedApplication.latitude)}/${Number(selectedApplication.longitude)}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        <Map className="w-4 h-4" />
-                        Ouvrir dans OpenStreetMap
-                      </a>
+                      <div className="flex gap-2">
+                        <a
+                          href={`https://www.google.com/maps?q=${Number(selectedApplication.latitude)},${Number(selectedApplication.longitude)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                        >
+                          <Map className="w-4 h-4" />
+                          Google Maps
+                        </a>
+                        <a
+                          href={`https://www.openstreetmap.org/?mlat=${Number(selectedApplication.latitude)}&mlon=${Number(selectedApplication.longitude)}#map=16/${Number(selectedApplication.latitude)}/${Number(selectedApplication.longitude)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-100 text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                          <MapPin className="w-4 h-4" />
+                          OpenStreetMap
+                        </a>
+                      </div>
                     </div>
                   </div>
                 </div>

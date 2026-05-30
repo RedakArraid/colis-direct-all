@@ -52,9 +52,9 @@ export default function ZoneMapSelector({ onZoneSelected, initialBounds }: ZoneM
         const map = Leaflet.map(mapRef.current).setView(ABIDJAN_CENTER, DEFAULT_ZOOM);
         mapInstanceRef.current = map;
 
-        // Add OpenStreetMap tile layer
-        Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap contributors',
+        // Add épuré CartoDB Positron tile layer
+        Leaflet.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
           maxZoom: 19,
         }).addTo(map);
 

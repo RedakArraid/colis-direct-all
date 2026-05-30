@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MapPin, Navigation, Phone, Clock, ExternalLink } from 'lucide-react';
 
 interface RelayPoint {
@@ -14,6 +14,7 @@ interface RelayPoint {
   latitude?: number;
   longitude?: number;
   is_active: boolean;
+  is_active_map?: boolean; // internal helper
 }
 
 interface RelayPointsMapProps {
@@ -21,10 +22,43 @@ interface RelayPointsMapProps {
   onRelayPointClick?: (relayPoint: RelayPoint) => void;
 }
 
+// Camera controller helper for Leaflet Map
+function MapCameraController({ selectedRelay, useMap }: { selectedRelay: any; useMap: any }) {
+  const map = useMap();
+  useEffect(() => {
+    if (selectedRelay?.latitude && selectedRelay?.longitude) {
+      map.flyTo(
+        [Number(selectedRelay.latitude), Number(selectedRelay.longitude)],
+        15,
+        { animate: true, duration: 1.5 }
+      );
+    }
+  }, [selectedRelay, map]);
+  return null;
+}
+
 export default function RelayPointsMap({ relayPoints, onRelayPointClick }: RelayPointsMapProps) {
   const [selectedRelay, setSelectedRelay] = useState<RelayPoint | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>([5.3599, -4.0083]); // Abidjan center
   const [, setMapZoom] = useState(12);
+  const [MapComponents, setMapComponents] = useState<any>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([
+      import('leaflet'),
+      import('react-leaflet'),
+      import('leaflet/dist/leaflet.css'),
+    ]).then(async ([L, RL]) => {
+      if (!mounted) return;
+      const mk2x = (await import('leaflet/dist/images/marker-icon-2x.png')).default;
+      const mk = (await import('leaflet/dist/images/marker-icon.png')).default;
+      const sh = (await import('leaflet/dist/images/marker-shadow.png')).default;
+      L.Icon.Default.mergeOptions({ iconRetinaUrl: mk2x, iconUrl: mk, shadowUrl: sh });
+      setMapComponents({ L, ...RL });
+    });
+    return () => { mounted = false; };
+  }, []);
 
   // Filter relay points with coordinates
   const pointsWithCoords = relayPoints.filter(rp => rp.latitude && rp.longitude);
@@ -92,16 +126,71 @@ export default function RelayPointsMap({ relayPoints, onRelayPointClick }: Relay
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="relative" style={{ height: '600px' }}>
           {/* Embed OpenStreetMap with Leaflet */}
-          <iframe
-            width="100%"
-            height="100%"
-            frameBorder="0"
-            scrolling="no"
-            marginHeight={0}
-            marginWidth={0}
-            src={`https://www.openstreetmap.org/export/embed.html?bbox=${mapCenter[1] - 0.1},${mapCenter[0] - 0.1},${mapCenter[1] + 0.1},${mapCenter[0] + 0.1}&layer=mapnik&marker=${mapCenter[0]},${mapCenter[1]}`}
-            style={{ border: '1px solid #ccc' }}
-          />
+          {MapComponents && pointsWithCoords.length > 0 ? (
+            <MapComponents.MapContainer
+              center={mapCenter}
+              zoom={selectedRelay ? 15 : 12}
+              zoomControl={false}
+              style={{ height: '100%', width: '100%', zIndex: 1 }}
+            >
+              <MapComponents.TileLayer
+                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+              />
+              <MapCameraController selectedRelay={selectedRelay} useMap={MapComponents.useMap} />
+              {pointsWithCoords.map((r) => {
+                const isSelected = selectedRelay?.id === r.id;
+                const customIcon = MapComponents.L.divIcon({
+                  className: 'custom-leaflet-icon',
+                  html: `
+                    <div class="custom-marker ${isSelected ? 'active-marker' : ''}" style="
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      width: ${isSelected ? '36px' : '28px'};
+                      height: ${isSelected ? '36px' : '28px'};
+                      background: #FF6C00;
+                      border: 2.5px solid #ffffff;
+                      border-radius: 50%;
+                      box-shadow: 0 4px 10px rgba(255, 108, 0, 0.4);
+                      color: #ffffff;
+                      position: relative;
+                      transition: all 0.2s ease;
+                    ">
+                      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+                      </svg>
+                    </div>
+                  `,
+                  iconSize: isSelected ? [36, 36] : [28, 28],
+                  iconAnchor: isSelected ? [18, 18] : [14, 14],
+                });
+
+                return (
+                  <MapComponents.Marker
+                    key={r.id}
+                    position={[Number(r.latitude), Number(r.longitude)]}
+                    icon={customIcon}
+                    eventHandlers={{
+                      click: () => handleMarkerClick(r),
+                    }}
+                  />
+                );
+              })}
+            </MapComponents.MapContainer>
+          ) : (
+            <iframe
+              width="100%"
+              height="100%"
+              frameBorder="0"
+              scrolling="no"
+              marginHeight={0}
+              marginWidth={0}
+              src={`https://www.openstreetmap.org/export/embed.html?bbox=${mapCenter[1] - 0.1},${mapCenter[0] - 0.1},${mapCenter[1] + 0.1},${mapCenter[0] + 0.1}&layer=mapnik&marker=${mapCenter[0]},${mapCenter[1]}`}
+              style={{ border: '1px solid #ccc', position: 'absolute', inset: 0 }}
+              title="Carte points relais export"
+            />
+          )}
           
           {/* Overlay with markers list */}
           <div className="absolute top-4 right-4 bg-white rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] p-4 max-w-xs max-h-96 overflow-y-auto">

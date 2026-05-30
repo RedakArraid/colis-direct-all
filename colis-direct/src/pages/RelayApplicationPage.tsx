@@ -21,6 +21,24 @@ function RelayApplicationPage({ onNavigate }: RelayApplicationPageProps) {
   const [applicationId, setApplicationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showMapModal, setShowMapModal] = useState(false);
+  const [MapComponents, setMapComponents] = useState<any>(null);
+
+  useState(() => {
+    let mounted = true;
+    Promise.all([
+      import('leaflet'),
+      import('react-leaflet'),
+      import('leaflet/dist/leaflet.css'),
+    ]).then(async ([L, RL]) => {
+      if (!mounted) return;
+      const mk2x = (await import('leaflet/dist/images/marker-icon-2x.png')).default;
+      const mk = (await import('leaflet/dist/images/marker-icon.png')).default;
+      const sh = (await import('leaflet/dist/images/marker-shadow.png')).default;
+      L.Icon.Default.mergeOptions({ iconRetinaUrl: mk2x, iconUrl: mk, shadowUrl: sh });
+      setMapComponents({ L, ...RL });
+    });
+    return () => { mounted = false; };
+  });
 
   const [formData, setFormData] = useState({
     applicant_first_name: '',
@@ -453,10 +471,28 @@ function RelayApplicationPage({ onNavigate }: RelayApplicationPageProps) {
                 {formData.commune && <div className="text-green-700 font-medium">Commune : {formData.commune} ✓</div>}
                 <div className="text-orange-600 font-medium">Complétez le quartier et l'adresse dans le formulaire.</div>
               </div>
-              <div className="relative w-full h-[480px]">
-                <iframe width="100%" height="100%" frameBorder="0" scrolling="no"
-                  src={`https://www.openstreetmap.org/export/embed.html?bbox=${formData.longitude - 0.01},${formData.latitude - 0.01},${formData.longitude + 0.01},${formData.latitude + 0.01}&layer=mapnik&marker=${formData.latitude},${formData.longitude}`}
-                  className="rounded-xl border-2 border-[#FF6C00]" />
+              <div className="relative w-full h-[480px] rounded-xl overflow-hidden border-2 border-[#FF6C00] bg-[#F6F7F9]">
+                {MapComponents ? (
+                  <MapComponents.MapContainer
+                    center={[formData.latitude, formData.longitude]}
+                    zoom={15}
+                    zoomControl={true}
+                    style={{ height: '100%', width: '100%', zIndex: 1 }}
+                  >
+                    <MapComponents.TileLayer
+                      url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                    />
+                    <MapComponents.Marker
+                      position={[formData.latitude, formData.longitude]}
+                    />
+                  </MapComponents.MapContainer>
+                ) : (
+                  <iframe width="100%" height="100%" frameBorder="0" scrolling="no"
+                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${formData.longitude - 0.01},${formData.latitude - 0.01},${formData.longitude + 0.01},${formData.latitude + 0.01}&layer=mapnik&marker=${formData.latitude},${formData.longitude}`}
+                    style={{ border: 'none', position: 'absolute', inset: 0 }}
+                    title="Carte position" />
+                )}
               </div>
               <div className="mt-4 flex flex-wrap gap-3">
                 <a href={`https://www.google.com/maps?q=${formData.latitude},${formData.longitude}`}

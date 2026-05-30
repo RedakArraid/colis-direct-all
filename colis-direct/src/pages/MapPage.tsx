@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MapPin, Phone, Clock, Search, Navigation, Loader2, X, Package } from 'lucide-react';
 import Footer from '../components/Footer';
 import Chatbot from '../components/Chatbot';
@@ -22,6 +22,21 @@ interface RelayPoint {
 
 const COMMUNE_CHIPS = ['Cocody', 'Plateau', 'Marcory', 'Yopougon', 'Treichville', 'Adjamé'];
 
+// Camera controller helper for Leaflet Map
+function MapCameraController({ selectedRelay, useMap }: { selectedRelay: any; useMap: any }) {
+  const map = useMap();
+  useEffect(() => {
+    if (selectedRelay?.latitude && selectedRelay?.longitude) {
+      map.flyTo(
+        [Number(selectedRelay.latitude), Number(selectedRelay.longitude)],
+        15,
+        { animate: true, duration: 1.5 }
+      );
+    }
+  }, [selectedRelay, map]);
+  return null;
+}
+
 function MapPage() {
   const [relayPoints, setRelayPoints] = useState<RelayPoint[]>([]);
   const [filteredRelays, setFilteredRelays] = useState<RelayPoint[]>([]);
@@ -32,6 +47,24 @@ function MapPage() {
   const [selectedRelay, setSelectedRelay] = useState<RelayPoint | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [MapComponents, setMapComponents] = useState<any>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([
+      import('leaflet'),
+      import('react-leaflet'),
+      import('leaflet/dist/leaflet.css'),
+    ]).then(async ([L, RL]) => {
+      if (!mounted) return;
+      const mk2x = (await import('leaflet/dist/images/marker-icon-2x.png')).default;
+      const mk = (await import('leaflet/dist/images/marker-icon.png')).default;
+      const sh = (await import('leaflet/dist/images/marker-shadow.png')).default;
+      L.Icon.Default.mergeOptions({ iconRetinaUrl: mk2x, iconUrl: mk, shadowUrl: sh });
+      setMapComponents({ L, ...RL });
+    });
+    return () => { mounted = false; };
+  }, []);
 
   useEffect(() => {
     loadRelayPoints();
@@ -320,54 +353,113 @@ function MapPage() {
         </aside>
 
         {/* Map area */}
-        <div className="flex-1 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #E8F0E8 0%, #DDEBDD 100%)' }}>
-          {/* SVG road lines */}
-          <svg width="100%" height="100%" viewBox="0 0 800 700" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-            <path d="M-20 150 L820 200" stroke="#fff" strokeWidth="20" />
-            <path d="M-20 350 L820 380" stroke="#fff" strokeWidth="16" />
-            <path d="M-20 530 L820 560" stroke="#fff" strokeWidth="12" />
-            <path d="M200 -20 L220 720" stroke="#fff" strokeWidth="18" />
-            <path d="M450 -20 L470 720" stroke="#fff" strokeWidth="14" />
-            <path d="M650 -20 L670 720" stroke="#fff" strokeWidth="10" />
-            <rect x="280" y="240" width="120" height="80" fill="#D0E0E8" opacity="0.7" rx="4" />
-            <rect x="500" y="400" width="100" height="60" fill="#D0E0E8" opacity="0.7" rx="4" />
-            <path d="M-20 100 Q 400 80, 820 120" stroke="#A8D5E8" strokeWidth="8" fill="none" opacity="0.7" />
-          </svg>
+        <div className="flex-1 relative overflow-hidden h-full bg-[#F6F7F9]">
+          {MapComponents && filteredRelays.length > 0 ? (
+            <MapComponents.MapContainer
+              center={selectedRelay?.latitude && selectedRelay?.longitude ? [Number(selectedRelay.latitude), Number(selectedRelay.longitude)] : [5.316667, -4.033333]}
+              zoom={selectedRelay ? 15 : 12}
+              zoomControl={false}
+              style={{ height: '100%', width: '100%', zIndex: 1 }}
+            >
+              <MapComponents.TileLayer
+                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+              />
+              <MapCameraController selectedRelay={selectedRelay} useMap={MapComponents.useMap} />
+              {filteredRelays
+                .filter((r) => r.latitude && r.longitude)
+                .map((r) => {
+                  const isSelected = selectedRelay?.id === r.id;
+                  const customIcon = MapComponents.L.divIcon({
+                    className: 'custom-leaflet-icon',
+                    html: `
+                      <div class="custom-marker ${isSelected ? 'active-marker' : ''}" style="
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: ${isSelected ? '36px' : '28px'};
+                        height: ${isSelected ? '36px' : '28px'};
+                        background: #FF6C00;
+                        border: 2.5px solid #ffffff;
+                        border-radius: 50%;
+                        box-shadow: 0 4px 10px rgba(255, 108, 0, 0.4);
+                        color: #ffffff;
+                        position: relative;
+                        transition: all 0.2s ease;
+                      ">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+                        </svg>
+                      </div>
+                    `,
+                    iconSize: isSelected ? [36, 36] : [28, 28],
+                    iconAnchor: isSelected ? [18, 18] : [14, 14],
+                  });
 
-          {/* OpenStreetMap iframe (overlay on top of decorative SVG) */}
-          {filteredRelays.length > 0 && (
-            <iframe
-              key={buildMapUrl()}
-              src={buildMapUrl()}
-              width="100%"
-              height="100%"
-              frameBorder="0"
-              scrolling="no"
-              style={{ position: 'absolute', inset: 0, opacity: 0.92 }}
-              title="Carte points relais"
-            />
-          )}
-
-          {/* Orange pins (decorative fallback when no iframe) */}
-          {filteredRelays.length === 0 && !loading && (
+                  return (
+                    <MapComponents.Marker
+                      key={r.id}
+                      position={[Number(r.latitude), Number(r.longitude)]}
+                      icon={customIcon}
+                      eventHandlers={{
+                        click: () => setSelectedRelay(r),
+                      }}
+                    >
+                      <MapComponents.Popup>
+                        <div className="p-2 min-w-[200px]">
+                          <div className="font-extrabold text-sm text-[#1A1A1A]">{r.name}</div>
+                          <div className="text-xs text-[#6B7280] mt-1">{r.address}</div>
+                          <div className="text-xs text-[#FF6C00] font-bold mt-1.5">{r.hours}</div>
+                          <button
+                            onClick={() => handleGetDirections(r)}
+                            className="w-full mt-3 bg-[#FF6C00] hover:bg-[#E66100] text-white text-xs font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors border-none"
+                          >
+                            <Navigation className="w-3.5 h-3.5" />
+                            Y aller
+                          </button>
+                        </div>
+                      </MapComponents.Popup>
+                    </MapComponents.Marker>
+                  );
+                })}
+            </MapComponents.MapContainer>
+          ) : (
             <>
-              {[
-                { x: 150, y: 200 }, { x: 280, y: 300 }, { x: 380, y: 180 },
-                { x: 500, y: 250 }, { x: 620, y: 320 }, { x: 200, y: 450 },
-                { x: 450, y: 480 }, { x: 580, y: 540 }, { x: 700, y: 200 },
-              ].map((p, i) => (
-                <div
-                  key={i}
-                  style={{ position: 'absolute', left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}
-                >
-                  <div
-                    className="flex items-center justify-center rounded-full border-2 border-white shadow-lg"
-                    style={{ width: 32, height: 32, background: '#FF6C00' }}
-                  >
-                    <Package className="w-4 h-4 text-white" />
-                  </div>
-                </div>
-              ))}
+              {/* SVG road lines */}
+              <svg width="100%" height="100%" viewBox="0 0 800 700" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+                <path d="M-20 150 L820 200" stroke="#fff" strokeWidth="20" />
+                <path d="M-20 350 L820 380" stroke="#fff" strokeWidth="16" />
+                <path d="M-20 530 L820 560" stroke="#fff" strokeWidth="12" />
+                <path d="M200 -20 L220 720" stroke="#fff" strokeWidth="18" />
+                <path d="M450 -20 L470 720" stroke="#fff" strokeWidth="14" />
+                <path d="M650 -20 L670 720" stroke="#fff" strokeWidth="10" />
+                <rect x="280" y="240" width="120" height="80" fill="#D0E0E8" opacity="0.7" rx="4" />
+                <rect x="500" y="400" width="100" height="60" fill="#D0E0E8" opacity="0.7" rx="4" />
+                <path d="M-20 100 Q 400 80, 820 120" stroke="#A8D5E8" strokeWidth="8" fill="none" opacity="0.7" />
+              </svg>
+
+              {/* Orange pins (decorative fallback when no iframe) */}
+              {filteredRelays.length === 0 && !loading && (
+                <>
+                  {[
+                    { x: 150, y: 200 }, { x: 280, y: 300 }, { x: 380, y: 180 },
+                    { x: 500, y: 250 }, { x: 620, y: 320 }, { x: 200, y: 450 },
+                    { x: 450, y: 480 }, { x: 580, y: 540 }, { x: 700, y: 200 },
+                  ].map((p, i) => (
+                    <div
+                      key={i}
+                      style={{ position: 'absolute', left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}
+                    >
+                      <div
+                        className="flex items-center justify-center rounded-full border-2 border-white shadow-lg"
+                        style={{ width: 32, height: 32, background: '#FF6C00' }}
+                      >
+                        <Package className="w-4 h-4 text-white" />
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
             </>
           )}
 
@@ -406,7 +498,7 @@ function MapPage() {
 
           {/* Loading overlay */}
           {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/60">
+            <div className="absolute inset-0 flex items-center justify-center bg-white/60 z-50">
               <Loader2 className="w-8 h-8 animate-spin text-[#FF6C00]" />
             </div>
           )}
