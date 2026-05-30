@@ -284,6 +284,9 @@ const API = {
   getRecipientAddresses: () => API.request('GET', '/api/recipient-addresses'),
   createShipment: (data) => API.request('POST', '/api/shipments', data),
   getTracking: (number) => API.request('GET', `/api/tracking/${encodeURIComponent(number)}`),
+  changePassword: (userId, currentPassword, newPassword) => API.request('POST', `/api/users/${userId}/change-password`, { current_password: currentPassword, new_password: newPassword }),
+  deleteAccount: (userId) => API.request('DELETE', `/api/users/${userId}`),
+  updateProfile: (userId, data) => API.request('PUT', `/api/users/${userId}`, data),
 };
 
 function toggleApiEnv() {
@@ -813,10 +816,14 @@ function openSupport() {
       <div style="font-size:17px;font-weight:700;color:#1A1A1A;margin-bottom:4px">Support client</div>
       <div style="font-size:13px;color:#6B7280;margin-bottom:20px">Disponible 24h/24 et 7j/7</div>
       <div style="display:flex;flex-direction:column;gap:10px">
-        <a href="tel:+22507000000" class="btn btn-primary btn-full" style="text-decoration:none">
+        <a href="tel:+2250700000000" class="btn btn-primary btn-full" style="text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px">
           ${icon('phone', 18)} Appeler le support
         </a>
-        <a href="mailto:support@colisdirect.ci" class="btn btn-outline btn-full" style="text-decoration:none">
+        <a href="https://wa.me/2250700000000" target="_blank" rel="noreferrer" class="btn btn-full" style="background:#E6F6EC;color:#16A34A;border:none;border-radius:14px;padding:14px;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="#16A34A" style="display:inline-block;vertical-align:middle"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.248 8.477 3.514 2.266 2.265 3.51 5.276 3.51 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.458L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.863-9.73 0-2.597-1.012-5.04-2.85-6.88A9.74 9.74 0 0 0 12.008 1.24c-5.44 0-9.866 4.372-9.87 9.732 0 1.689.452 3.335 1.307 4.788l-.99 3.616 3.74-.984zm11.758-6.17c-.302-.15-1.786-.88-2.062-.98-.276-.1-.476-.15-.676.15-.2.3-.775.98-.95 1.18-.175.2-.35.225-.65.075-.3-.15-1.265-.467-2.41-1.485-.89-.79-1.492-1.77-1.667-2.07-.175-.3-.02-.46.13-.61.137-.135.303-.35.454-.525.15-.175.2-.3.3-.5.1-.2.05-.375-.025-.525-.075-.15-.676-1.63-.926-2.235-.244-.588-.49-.5-.676-.51-.175-.01-.375-.01-.575-.01-.2 0-.525.075-.8.375-.275.3-1.05 1.025-1.05 2.5s1.075 2.9 1.225 3.1c.15.2 2.11 3.22 5.11 4.52.714.31 1.27.496 1.703.633.717.227 1.37.195 1.887.118.577-.087 1.786-.73 2.037-1.435.25-.705.25-1.31.175-1.435-.075-.125-.275-.2-.575-.35z"/></svg>
+          WhatsApp Direct
+        </a>
+        <a href="mailto:support@colisdirect.com" class="btn btn-outline btn-full" style="text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px">
           ${icon('mail', 18)} Envoyer un email
         </a>
         <button class="btn btn-ghost btn-full" onclick="Sheet.close()">Fermer</button>
@@ -1584,32 +1591,63 @@ function showEditProfile() {
   `, 'Modifier le profil');
 }
 
-function saveProfile() {
+async function saveProfile() {
+  if (!State.user) return;
   const fname = document.getElementById('edit-fname')?.value?.trim();
   const lname = document.getElementById('edit-lname')?.value?.trim();
   const email = document.getElementById('edit-email')?.value?.trim();
   const phone = document.getElementById('edit-phone')?.value?.trim();
   if (!fname || !lname) { Toast.show('Prénom et nom obligatoires', 'warning'); return; }
-  State.user = { ...State.user, first_name: fname, last_name: lname, email, phone };
-  State.save();
-  Sheet.close();
-  Toast.show('Profil mis à jour !', 'success');
-  renderProfile();
+  
+  const btn = document.querySelector('#bottom-sheet .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enregistrement...'; }
+  
+  const res = await API.updateProfile(State.user.id, { first_name: fname, last_name: lname, email, phone });
+  
+  if (btn) { btn.disabled = false; btn.textContent = 'Enregistrer'; }
+  
+  if (res.error) {
+    Toast.show(res.error, 'error');
+  } else {
+    State.user = { ...State.user, first_name: fname, last_name: lname, email, phone };
+    State.save();
+    Sheet.close();
+    Toast.show('Profil mis à jour !', 'success');
+    renderProfile();
+  }
 }
 
 function showAddressBook() {
-  Sheet.open(`
-    <div style="padding:4px 0 16px">
-      <div style="text-align:center;padding:24px 0">
-        ${icon('mapPin', 40, '#D1D5DB')}
-        <div style="font-size:15px;font-weight:600;color:#6B7280;margin-top:12px">Aucune adresse sauvegardée</div>
-        <div style="font-size:13px;color:#9CA3AF;margin-top:4px">Vos adresses fréquentes apparaîtront ici</div>
-      </div>
-      <button class="btn btn-primary btn-full" onclick="Sheet.close();navigateToCreateShipment()">
+  const addresses = State.recipientAddresses || [];
+  const content = `
+    <div style="display:flex;flex-direction:column;gap:12px;padding:8px 0 16px;max-height:60vh;overflow-y:auto">
+      ${addresses.length === 0 ? `
+        <div style="text-align:center;padding:24px 0">
+          ${icon('mapPin', 40, '#D1D5DB')}
+          <div style="font-size:15px;font-weight:600;color:#6B7280;margin-top:12px">Aucune adresse sauvegardée</div>
+          <div style="font-size:13px;color:#9CA3AF;margin-top:4px">Vos destinataires enregistrés s'afficheront ici.</div>
+        </div>
+      ` : addresses.map((addr) => `
+        <div style="background:#fff;border:1px solid #E6E6E6;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:4px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:14px;font-weight:800;color:#1A1A1A">${addr.first_name || ''} ${addr.last_name || ''}</span>
+            <span class="badge badge-orange" style="font-size:9px;padding:2px 7px">${addr.commune || ''}</span>
+          </div>
+          <div style="font-size:12px;color:#6B7280;display:flex;align-items:center;gap:4px">
+            ${icon('phone', 11, '#6B7280')} +225 ${addr.phone || ''}
+          </div>
+          <div style="font-size:12px;color:#6B7280;display:flex;align-items:center;gap:4px">
+            ${icon('home', 11, '#6B7280')} ${addr.quartier || ''}, ${addr.address || ''}
+          </div>
+        </div>
+      `).join('')}
+      <button class="btn btn-primary btn-full" style="margin-top:8px" onclick="Sheet.close();navigateToCreateShipment()">
         ${icon('plus', 16)} Créer un envoi
       </button>
+      <button class="btn btn-ghost btn-full" onclick="Sheet.close()">Fermer</button>
     </div>
-  `, 'Carnet d\'adresses');
+  `;
+  Sheet.open(content, "Carnet d'adresses");
 }
 
 function showPaymentHistory() {
@@ -3309,16 +3347,16 @@ function renderSettings() {
       <div class="section-label">Notifications</div>
       <div class="card" style="margin:0 16px 12px">
         ${[
-          { id: 'notif-colis', label: 'Mises à jour colis', sub: 'Statut et alertes de livraison', on: true },
-          { id: 'notif-promo', label: 'Offres promotionnelles', sub: 'Réductions et codes promo', on: false },
-          { id: 'notif-news',  label: 'Actualités ColisDirect', sub: 'Nouveaux services et fonctionnalités', on: true },
+          { id: 'notif-colis', label: 'Mises à jour colis', sub: 'Statut et alertes de livraison', on: localStorage.getItem('cd_pref_notif-colis') !== 'false' },
+          { id: 'notif-promo', label: 'Offres promotionnelles', sub: 'Réductions et codes promo', on: localStorage.getItem('cd_pref_notif-promo') === 'true' },
+          { id: 'notif-news',  label: 'Actualités ColisDirect', sub: 'Nouveaux services et fonctionnalités', on: localStorage.getItem('cd_pref_notif-news') !== 'false' },
         ].map(item => `
           <div class="list-item">
             <div class="list-item-content">
               <div class="list-item-title">${item.label}</div>
               <div class="list-item-sub">${item.sub}</div>
             </div>
-            <button id="${item.id}" class="switch ${item.on ? 'on' : ''}" onclick="this.classList.toggle('on')">
+            <button id="${item.id}" class="switch ${item.on ? 'on' : ''}" onclick="toggleNotifPref('${item.id}', this)">
               <div class="switch-thumb"></div>
             </button>
           </div>
@@ -3424,13 +3462,38 @@ function showChangePwd() {
   `, 'Mot de passe');
 }
 
-function doChangePwd() {
+function toggleNotifPref(id, buttonEl) {
+  const nextState = !buttonEl.classList.contains('on');
+  buttonEl.classList.toggle('on', nextState);
+  localStorage.setItem('cd_pref_' + id, nextState ? 'true' : 'false');
+  Toast.show('Préférence mise à jour', 'success', 1500);
+}
+
+async function doChangePwd() {
+  if (!State.user) {
+    Toast.show('Vous devez être connecté', 'error');
+    return;
+  }
+  const op = document.getElementById('old-pwd')?.value;
   const np = document.getElementById('new-pwd')?.value;
   const cp = document.getElementById('confirm-pwd')?.value;
-  if (!np || np.length < 6) { Toast.show('Mot de passe trop court', 'warning'); return; }
+  if (!op) { Toast.show('Mot de passe actuel obligatoire', 'warning'); return; }
+  if (!np || np.length < 6) { Toast.show('Le nouveau mot de passe doit faire au moins 6 caractères', 'warning'); return; }
   if (np !== cp) { Toast.show('Les mots de passe ne correspondent pas', 'error'); return; }
-  Sheet.close();
-  Toast.show('Mot de passe mis à jour !', 'success');
+  
+  const btn = document.querySelector('#bottom-sheet .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Mise à jour...'; }
+  
+  const res = await API.changePassword(State.user.id, op, np);
+  
+  if (btn) { btn.disabled = false; btn.textContent = 'Changer le mot de passe'; }
+  
+  if (res.error) {
+    Toast.show(res.error, 'error');
+  } else {
+    Sheet.close();
+    Toast.show('Mot de passe mis à jour !', 'success');
+  }
 }
 
 function clearCache() {
@@ -3467,10 +3530,22 @@ function deleteAccount() {
   `, 'Suppression');
 }
 
-function doDeleteAccount() {
-  doLogout();
-  Sheet.close();
-  Toast.show('Compte supprimé', 'success');
+async function doDeleteAccount() {
+  if (!State.user) return;
+  const btn = document.querySelector('#bottom-sheet .btn-full[onclick="doDeleteAccount()"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Suppression...'; }
+  
+  const res = await API.deleteAccount(State.user.id);
+  
+  if (btn) { btn.disabled = false; btn.textContent = 'Supprimer'; }
+  
+  if (res.error) {
+    Toast.show(res.error, 'error');
+  } else {
+    doLogout();
+    Sheet.close();
+    Toast.show('Votre compte a été supprimé', 'success');
+  }
 }
 
 /* ── PARTNER ───────────────────────────────────────────────────── */
