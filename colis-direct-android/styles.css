@@ -899,9 +899,9 @@ h4 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 /* ── Toast / Snackbar ──────────────────────────────────────── */
 .toast {
   position: fixed;
-  bottom: calc(var(--nav-height) + var(--safe-bottom) + 16px);
+  top: calc(var(--safe-top) + 16px);
   left: 50%;
-  transform: translateX(-50%) translateY(100px);
+  transform: translateX(-50%) translateY(-100px);
   max-width: 360px;
   width: calc(100% - 32px);
   padding: 14px 18px;

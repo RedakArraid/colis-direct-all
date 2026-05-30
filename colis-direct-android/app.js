@@ -626,7 +626,7 @@ function navigateToCreateShipment() {
 /* ── Toast ─────────────────────────────────────────────────────── */
 const Toast = {
   timer: null,
-  show(message, type = 'default', duration = 3200) {
+  show(message, type = 'default', duration = 2200) {
     const el = document.getElementById('toast');
     if (!el) return;
     if (this.timer) clearTimeout(this.timer);
@@ -1406,7 +1406,7 @@ async function confirmCancel(id) {
   if (!s.events) s.events = [];
   s.events.unshift({ status: 'CANCELLED', timestamp: new Date().toISOString(), notes: 'Annulé par l\'expéditeur' });
   Sheet.close();
-  Toast.show('Commande annulée. Remboursement en cours.', 'success', 4000);
+  Toast.show('Commande annulée. Remboursement en cours.', 'success', 2500);
   Router.navigate('shipments');
 }
 
@@ -1994,7 +1994,7 @@ async function submitSignup() {
 
   if (error) { showLoginError(error); return; }
 
-  Toast.show('Compte créé avec succès ! Connectez-vous.', 'success', 4000);
+  Toast.show('Compte créé avec succès ! Connectez-vous.', 'success', 2500);
   isSignup = false;
   renderLogin();
 }
@@ -2877,7 +2877,7 @@ async function submitShipment() {
     Object.keys(createData).forEach(k => delete createData[k]);
 
     Router.navigate('tracking-detail', { shipment: data });
-    Toast.show(`✓ Colis ${data.shipment_code} créé ! Déposez-le dans un relais.`, 'success', 5000);
+    Toast.show(`✓ Colis ${data.shipment_code} créé ! Déposez-le dans un relais.`, 'success', 3000);
   }
 }
 
@@ -3591,7 +3591,7 @@ function submitPartner(type) {
   const phone = document.getElementById('partner-phone')?.value?.trim();
   if (!name || !phone) { Toast.show('Remplissez les champs obligatoires', 'warning'); return; }
   Sheet.close();
-  Toast.show(`Candidature ${type === 'livreur' ? 'livreur' : 'relais'} envoyée ! Nous vous contactons sous 48h.`, 'success', 5000);
+  Toast.show(`Candidature ${type === 'livreur' ? 'livreur' : 'relais'} envoyée ! Nous vous contactons sous 48h.`, 'success', 3000);
 }
 
 /* ── CANCEL SHIPMENT ───────────────────────────────────────────── */
