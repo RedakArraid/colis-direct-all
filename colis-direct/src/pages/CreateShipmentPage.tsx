@@ -418,6 +418,7 @@ function CreateShipmentPage({ onNavigate }: CreateShipmentPageProps) {
                     sender_repere: formData.sender_repere || null,
                     recipient_repere: formData.recipient_repere || null,
                     package_type: formData.package_type,
+                    grid_type: formData.grid_type,
                     weight: formData.weight,
                     print_at_relay: paymentOptions?.printOption === 'relay',
                     relay_assisted: false,

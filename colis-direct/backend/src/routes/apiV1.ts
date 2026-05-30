@@ -53,32 +53,7 @@ router.get(
                 s.package_type, s.weight, s.home_delivery,
                 s.origin_relay_id, s.destination_relay_id,
                 s.price, s.payment_method, s.created_at, s.updated_at,
-                CASE
-                  WHEN s.payment_method = 'relay_cash'
-                    AND (s.payment_status = 'paid' OR COALESCE(rcp.status::text, '') = 'collected')
-                    THEN 'PAYMENT_RECEIVED_AT_RELAY'
-                  WHEN s.payment_method = 'relay_cash'
-                    THEN 'PAYMENT_PENDING_AT_RELAY'
-                  WHEN s.payment_method = 'mobile_money' AND COALESCE(mmp.status::text, '') = 'rejected'
-                    THEN 'PAYMENT_REJECTED'
-                  WHEN s.payment_method = 'mobile_money'
-                    AND s.payment_status = 'pending'
-                    AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                    THEN 'PAYMENT_AWAITING_VALIDATION'
-                  WHEN s.payment_method = 'mobile_money'
-                    AND s.payment_status = 'paid'
-                    AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                    THEN 'PAYMENT_CONFIRMED_AWAITING_DROP'
-                  WHEN s.payment_method IN ('paystack', 'cinetpay')
-                    AND s.payment_status = 'pending'
-                    AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                    THEN 'PAYMENT_AWAITING_VALIDATION'
-                  WHEN s.payment_method IN ('paystack', 'cinetpay')
-                    AND s.payment_status = 'paid'
-                    AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                    THEN 'PAYMENT_CONFIRMED_AWAITING_DROP'
-                  ELSE COALESCE(s.current_status::text, 'READY_FOR_DROP_OFF')
-                END AS effective_status,
+                shipment_effective_status(s.current_status::text, s.payment_method, s.payment_status, COALESCE(mmp.status::text, ''), COALESCE(rcp.status::text, '')) AS effective_status,
                 o.name AS origin_relay_name, o.commune AS origin_relay_commune, o.address AS origin_relay_address,
                 d.name AS destination_relay_name, d.commune AS destination_relay_commune, d.address AS destination_relay_address
          FROM shipments s

@@ -110,6 +110,7 @@ const ICONS = {
   bike:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>`,
   book:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10M6 10h10"/></svg>`,
   tag:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/></svg>`,
+  database:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>`,
 };
 
 function icon(name, size = 20, color = 'currentColor') {
@@ -124,6 +125,11 @@ const State = {
   prevScreenStack: [],
   notifications: [],
   trackingResult: null,
+  shipments: null,
+  relayPoints: null,
+  recipientAddresses: null,
+  pricing: null,
+  pricingKey: null,
 
   load() {
     try {
@@ -149,6 +155,43 @@ const State = {
         notifications: this.notifications,
       }));
     } catch(e) {}
+  },
+
+  clear() {
+    this.user = null;
+    this.shipments = null;
+    this.relayPoints = null;
+    this.recipientAddresses = null;
+    localStorage.removeItem('cd_token');
+    this.save();
+  },
+
+  async loadAllData() {
+    try {
+      const relayRes = await API.getRelayPoints();
+      if (!relayRes.error) this.relayPoints = relayRes.data;
+    } catch(e) {
+      console.error("Erreur de chargement des points relais :", e);
+    }
+
+    if (this.user) {
+      try {
+        const [shipmentsRes, addrRes] = await Promise.all([
+          API.getShipments(),
+          API.getRecipientAddresses()
+        ]);
+        
+        if (!shipmentsRes.error) this.shipments = shipmentsRes.data;
+        if (!addrRes.error) this.recipientAddresses = addrRes.data;
+      } catch(e) {
+        console.error("Erreur de chargement des données utilisateur :", e);
+      }
+    }
+    
+    // Auto re-render active screen once data loaded
+    if (['home', 'shipments', 'map', 'create-shipment'].includes(this.currentScreen)) {
+      Router._render(this.currentScreen);
+    }
   },
 
   _defaultNotifications() {
@@ -179,7 +222,43 @@ const State = {
 
 /* ── API Client ────────────────────────────────────────────────── */
 const API = {
-  baseUrl: 'https://api.colisdirect.com',
+  get baseUrl() {
+    const forcedEnv = localStorage.getItem('cd_api_env');
+    if (forcedEnv === 'production') return 'https://api.colisdirect.com';
+    if (forcedEnv === 'staging') return 'https://staging-api.colisdirect.com';
+    
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    
+    const isLocal = 
+      protocol === 'file:' ||
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      /^192\.168\./.test(hostname) ||
+      /^10\./.test(hostname) ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname);
+      
+    return isLocal ? 'https://staging-api.colisdirect.com' : 'https://api.colisdirect.com';
+  },
+
+  get envName() {
+    const forcedEnv = localStorage.getItem('cd_api_env');
+    if (forcedEnv === 'production') return 'Prod (forcé)';
+    if (forcedEnv === 'staging') return 'Staging (forcé)';
+    
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    
+    const isLocal = 
+      protocol === 'file:' ||
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      /^192\.168\./.test(hostname) ||
+      /^10\./.test(hostname) ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname);
+      
+    return isLocal ? 'Staging (auto)' : 'Prod (auto)';
+  },
 
   async request(method, path, data = null) {
     const token = localStorage.getItem('cd_token');
@@ -192,6 +271,7 @@ const API = {
       if (!res.ok) return { error: json.error || json.message || 'Erreur serveur' };
       return { data: json };
     } catch(e) {
+      if (window.logDebug) window.logDebug(`API request failed [${method} ${this.baseUrl + path}]: ${e.message || e}`);
       return { error: 'Connexion impossible. Vérifiez votre réseau.' };
     }
   },
@@ -199,7 +279,37 @@ const API = {
   signIn: (id, pwd, isPhone) => API.request('POST', '/api/auth/signin', isPhone ? { phone: id, password: pwd } : { email: id, password: pwd }),
   signUp: (payload) => API.request('POST', '/api/auth/signup', payload),
   getMe: () => API.request('GET', '/api/auth/me'),
+  getShipments: () => API.request('GET', '/api/shipments'),
+  getRelayPoints: () => API.request('GET', '/api/relay-points'),
+  getRecipientAddresses: () => API.request('GET', '/api/recipient-addresses'),
+  createShipment: (data) => API.request('POST', '/api/shipments', data),
+  getTracking: (number) => API.request('GET', `/api/tracking/${encodeURIComponent(number)}`),
 };
+
+function toggleApiEnv() {
+  const current = localStorage.getItem('cd_api_env');
+  let next;
+  if (!current) {
+    next = 'staging';
+  } else if (current === 'staging') {
+    next = 'production';
+  } else {
+    next = null;
+  }
+  
+  if (next) {
+    localStorage.setItem('cd_api_env', next);
+  } else {
+    localStorage.removeItem('cd_api_env');
+  }
+  
+  Toast.show(`Serveur API : ${API.envName}`, 'success');
+  
+  // Clear token and user session to avoid issues across environments
+  State.clear();
+  
+  renderSettings();
+}
 
 /* ── Demo Data ─────────────────────────────────────────────────── */
 const DEMO_SHIPMENTS = [
@@ -503,6 +613,16 @@ const Router = {
   }
 };
 
+/* ── Auth-gated create-shipment navigation ─────────────────────── */
+function navigateToCreateShipment() {
+  if (!State.user) {
+    Toast.show('Connectez-vous pour envoyer un colis', 'warning');
+    Router.navigate('login');
+    return;
+  }
+  Router.navigate('create-shipment');
+}
+
 /* ── Toast ─────────────────────────────────────────────────────── */
 const Toast = {
   timer: null,
@@ -549,7 +669,7 @@ function renderHome() {
   const el = document.getElementById('screen-home');
   if (!el) return;
 
-  const activeShipments = State.user ? DEMO_SHIPMENTS.filter(s =>
+  const activeShipments = (State.user && State.shipments) ? State.shipments.filter(s =>
     !['PICKED_UP_BY_CUSTOMER','DELIVERED','DELIVERED_TO_CUSTOMER','CANCELLED','RETURN_TO_SENDER'].includes(s.current_status)
   ) : [];
 
@@ -577,10 +697,10 @@ function renderHome() {
           <div class="track-card-label" style="color:#ffffff">${icon('search', 13, '#ffffff')} &nbsp;Suivi rapide</div>
           <div class="track-input-row">
             <input class="track-input" id="home-track-input"
-              placeholder="Ex: CD202605290001CI"
-              maxlength="30"
-              oninput="this.value=this.value.toUpperCase()"
-              onkeydown="if(event.key==='Enter')handleHomeTrack()" />
+               placeholder="Ex: CD202605290001CI"
+               maxlength="30"
+               oninput="this.value=this.value.toUpperCase()"
+               onkeydown="if(event.key==='Enter')handleHomeTrack()" />
             <button class="track-btn" id="home-track-btn" onclick="handleHomeTrack()">Suivre</button>
           </div>
         </div>
@@ -593,7 +713,7 @@ function renderHome() {
     <div class="card" style="margin:16px;border-radius:20px;overflow:hidden">
       <div class="section-label" style="padding:14px 16px 6px">Services rapides</div>
       <div class="services-grid">
-        <div class="service-item" id="svc-envoyer" onclick="Router.navigate('create-shipment')">
+        <div class="service-item" id="svc-envoyer" onclick="navigateToCreateShipment()">
           <div class="service-icon" style="background:#FFF3E8">${icon('package', 24, '#FF6C00')}</div>
           <span class="service-label" style="text-align:center">Envoyer un colis</span>
         </div>
@@ -604,33 +724,39 @@ function renderHome() {
       </div>
     </div>
 
-    <!-- Colis actifs -->
-    ${activeShipments.length > 0 ? `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:0 16px;margin-bottom:10px">
-        <h3 style="font-size:15px;font-weight:700;color:#1A1A1A">Colis en cours</h3>
-        <button onclick="Router.navigate('shipments')" style="font-size:12px;font-weight:700;color:#FF6C00;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:2px">
-          Tout voir ${icon('chevronRight', 14, '#FF6C00')}
-        </button>
-      </div>
-      <div class="scroll-x" style="padding-bottom:4px;margin-bottom:20px">
-        <div class="scroll-x-inner">
-          ${activeShipments.map(s => renderPackageCard(s)).join('')}
+    <!-- Colis actifs (only when logged in) -->
+    ${State.user ? (
+      State.shipments === null ? `
+        <div style="display:flex;justify-content:center;padding:30px">
+          <div class="spinner" style="width:24px;height:24px;border-top-color:#FF6C00;border-width:2px"></div>
         </div>
-      </div>
-    ` : `
-      <div style="padding:0 16px;margin-bottom:4px">
-        <div style="background:#FFF3E8;border-radius:16px;padding:16px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="Router.navigate('create-shipment')">
-          <div style="width:44px;height:44px;background:#FF6C00;border-radius:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            ${icon('plus', 24, 'white')}
-          </div>
-          <div>
-            <div style="font-size:14px;font-weight:700;color:#1A1A1A">Envoyez votre premier colis</div>
-            <div style="font-size:12px;color:#6B7280;margin-top:2px">Simple, rapide et sécurisé</div>
-          </div>
-          ${icon('chevronRight', 18, '#FF6C00')}
+      ` : (activeShipments.length > 0 ? `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 16px;margin-bottom:10px">
+          <h3 style="font-size:15px;font-weight:700;color:#1A1A1A">Colis en cours</h3>
+          <button onclick="Router.navigate('shipments')" style="font-size:12px;font-weight:700;color:#FF6C00;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:2px">
+            Tout voir ${icon('chevronRight', 14, '#FF6C00')}
+          </button>
         </div>
-      </div>
-    `}
+        <div class="scroll-x" style="padding-bottom:4px;margin-bottom:20px">
+          <div class="scroll-x-inner">
+            ${activeShipments.map(s => renderPackageCard(s)).join('')}
+          </div>
+        </div>
+      ` : `
+        <div style="padding:0 16px;margin-bottom:4px">
+          <div style="background:#FFF3E8;border-radius:16px;padding:16px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="navigateToCreateShipment()">
+            <div style="width:44px;height:44px;background:#FF6C00;border-radius:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              ${icon('plus', 24, 'white')}
+            </div>
+            <div>
+              <div style="font-size:14px;font-weight:700;color:#1A1A1A">Envoyez votre premier colis</div>
+              <div style="font-size:12px;color:#6B7280;margin-top:2px">Simple, rapide et sécurisé</div>
+            </div>
+            ${icon('chevronRight', 18, '#FF6C00')}
+          </div>
+        </div>
+      `)
+    ) : ''}
 
 
 
@@ -751,8 +877,20 @@ function renderShipments() {
     `;
     return;
   }
+  if (State.shipments === null) {
+    el.innerHTML = `
+      <div class="app-header">
+        <div style="font-size:17px;font-weight:700;color:#1A1A1A;flex:1">Mes colis</div>
+      </div>
+      <div style="display:flex;justify-content:center;padding:100px 30px">
+        <div class="spinner" style="width:32px;height:32px;border-top-color:#FF6C00;border-width:2.5px"></div>
+      </div>
+    `;
+    State.loadAllData();
+    return;
+  }
 
-  const all = DEMO_SHIPMENTS;
+  const all = State.shipments;
   const active = all.filter(s => !['PICKED_UP_BY_CUSTOMER','DELIVERED','DELIVERED_TO_CUSTOMER','CANCELLED','RETURN_TO_SENDER'].includes(s.current_status));
   const delivered = all.filter(s => ['PICKED_UP_BY_CUSTOMER','DELIVERED','DELIVERED_TO_CUSTOMER'].includes(s.current_status));
 
@@ -769,7 +907,7 @@ function renderShipments() {
   el.innerHTML = `
     <div class="app-header">
       <div style="font-size:17px;font-weight:700;color:#1A1A1A;flex:1">Mes colis</div>
-      <button class="header-action" onclick="Router.navigate('create-shipment')" title="Nouveau colis">
+      <button class="header-action" onclick="navigateToCreateShipment()" title="Nouveau colis">
         ${icon('plus', 20)}
       </button>
     </div>
@@ -791,7 +929,7 @@ function renderShipments() {
           <div class="empty-icon">${icon('package', 36, '#FF6C00')}</div>
           <div class="empty-title">Aucun colis trouvé</div>
           <div class="empty-sub">${shipmentsQuery ? 'Essayez un autre terme de recherche.' : 'Commencez par envoyer votre premier colis.'}</div>
-          ${!shipmentsQuery ? `<button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="Router.navigate('create-shipment')">${icon('plus', 16)} Envoyer un colis</button>` : ''}
+          ${!shipmentsQuery ? `<button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="navigateToCreateShipment()">${icon('plus', 16)} Envoyer un colis</button>` : ''}
         </div>
       ` : list.map(s => renderShipmentListItem(s)).join('')}
     </div>
@@ -806,7 +944,7 @@ function setShipmentsTab(tab) {
 
 function filterShipments(q) {
   shipmentsQuery = q;
-  const all = DEMO_SHIPMENTS;
+  const all = State.shipments || [];
   let list = shipmentsTab === 'active'
     ? all.filter(s => !['PICKED_UP_BY_CUSTOMER','DELIVERED','DELIVERED_TO_CUSTOMER','CANCELLED','RETURN_TO_SENDER'].includes(s.current_status))
     : shipmentsTab === 'delivered'
@@ -858,7 +996,7 @@ function renderShipmentListItem(s) {
 }
 
 function showShipmentDetail(id) {
-  const s = DEMO_SHIPMENTS.find(x => x.id === id);
+  const s = (State.shipments || []).find(x => x.id === id || String(x.id) === String(id));
   if (!s) return;
   State.trackingResult = s;
   Router.navigate('tracking-detail', { shipment: s });
@@ -872,7 +1010,7 @@ function renderTracking(prefill = '') {
   el.innerHTML = `
     <div class="app-header">
       <div style="font-size:17px;font-weight:700;color:#1A1A1A;flex:1">Suivi de colis</div>
-      <button class="header-action" onclick="Router.navigate('create-shipment')" title="Envoyer un colis">
+      <button class="header-action" onclick="navigateToCreateShipment()" title="Envoyer un colis">
         ${icon('package', 20)}
       </button>
     </div>
@@ -897,15 +1035,15 @@ function renderTracking(prefill = '') {
 
     <div id="tracking-result-zone" style="padding:16px"></div>
 
-    <!-- Recent demo -->
-    ${State.user ? `
+    <!-- Recent searches -->
+    ${(State.user && State.shipments && State.shipments.length > 0) ? `
       <div class="section-label" style="padding:8px 16px 6px">Recherches récentes</div>
-      ${DEMO_SHIPMENTS.slice(0,3).map(s => `
+      ${State.shipments.slice(0,3).map(s => `
         <div class="list-item" onclick="quickTrack('${s.tracking_number}')">
           <div class="list-item-icon" style="background:#FFF3E8">${icon('clock', 16, '#FF6C00')}</div>
           <div class="list-item-content">
             <div style="font-size:12px;font-family:monospace;font-weight:700;color:#FF6C00;letter-spacing:0.04em">${s.tracking_number}</div>
-            <div class="list-item-sub">${s.sender_commune} → ${s.recipient_commune} · ${s.recipient_first_name} ${s.recipient_last_name}</div>
+            <div class="list-item-sub">${s.sender_commune || ''} → ${s.recipient_commune || ''} · ${s.recipient_first_name || ''} ${s.recipient_last_name || ''}</div>
           </div>
           ${icon('chevronRight', 15, '#D1D5DB')}
         </div>
@@ -930,23 +1068,31 @@ async function doTrack() {
 
   if (btn) { btn.innerHTML = `<div class="spinner" style="width:18px;height:18px;border-width:2.5px"></div>`; btn.disabled = true; }
 
-  await new Promise(r => setTimeout(r, 700));
+  const { data, error } = await API.getTracking(q);
 
   if (btn) { btn.innerHTML = `${icon('search', 16, 'white')} Suivre`; btn.disabled = false; }
 
-  const found = DEMO_SHIPMENTS.find(s => s.tracking_number.toUpperCase() === q || s.shipment_code.toUpperCase() === q);
   const resultZone = document.getElementById('tracking-result-zone');
   if (!resultZone) return;
 
-  if (found) {
-    State.trackingResult = found;
-    const badge = getStatusBadge(found.current_status);
-    const progress = getProgressPercent(found);
+  if (error) {
+    resultZone.innerHTML = `
+      <div style="background:#FEF2F2;border:1px solid #FCA5A5;color:#991B1B;padding:16px;border-radius:16px;font-size:13px;text-align:center;animation:slideUp 0.35s ease">
+        ${icon('alertTriangle', 20, '#DC2626')} &nbsp; ${error}
+      </div>
+    `;
+    return;
+  }
+
+  if (data) {
+    State.trackingResult = data;
+    const badge = getStatusBadge(data.current_status);
+    const progress = getProgressPercent(data);
     resultZone.innerHTML = `
       <div class="card" style="border-radius:18px;overflow:hidden;animation:slideUp 0.35s ease">
         <div style="background:linear-gradient(135deg,#FF6C00,#FF8533);padding:16px">
           <div style="font-size:11px;color:rgba(255,255,255,0.8);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Numéro de suivi</div>
-          <div style="font-size:16px;font-weight:800;font-family:monospace;color:#fff;margin-top:2px;letter-spacing:0.04em">${found.tracking_number}</div>
+          <div style="font-size:16px;font-weight:800;font-family:monospace;color:#fff;margin-top:2px;letter-spacing:0.04em">${data.tracking_number}</div>
           <div style="margin-top:10px">
             <span class="badge" style="background:rgba(255,255,255,0.2);color:#fff;font-size:11px">${badge.label}</span>
           </div>
@@ -959,19 +1105,19 @@ async function doTrack() {
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
             <div>
               <div style="font-size:11px;color:#6B7280;font-weight:600">DÉPART</div>
-              <div style="font-size:13px;font-weight:700;color:#1A1A1A">${found.sender_commune}</div>
+              <div style="font-size:13px;font-weight:700;color:#1A1A1A">${data.sender_commune || '—'}</div>
             </div>
             ${icon('arrowRight', 20, '#FF6C00')}
             <div style="text-align:right">
               <div style="font-size:11px;color:#6B7280;font-weight:600">ARRIVÉE</div>
-              <div style="font-size:13px;font-weight:700;color:#1A1A1A">${found.recipient_commune}</div>
+              <div style="font-size:13px;font-weight:700;color:#1A1A1A">${data.recipient_commune || '—'}</div>
             </div>
           </div>
           <div style="display:flex;gap:8px">
-            <button class="btn btn-primary" style="flex:1;font-size:13px;padding:11px" onclick="showShipmentDetail('${found.id}')">
+            <button class="btn btn-primary" style="flex:1;font-size:13px;padding:11px" onclick="Router.navigate('tracking-detail', { shipment: State.trackingResult })">
               ${icon('list', 15)} Voir le détail
             </button>
-            <button class="btn btn-outline btn-icon" title="Copier" onclick="copyTrackingNumber('${found.tracking_number}')">
+            <button class="btn btn-outline btn-icon" title="Copier" onclick="copyTrackingNumber('${data.tracking_number}')">
               ${icon('copy', 16)}
             </button>
           </div>
@@ -980,7 +1126,7 @@ async function doTrack() {
     `;
   } else {
     resultZone.innerHTML = `
-      <div class="card" style="padding:20px;text-align:center;border-color:#FEE2E2;animation:slideUp 0.3s ease">
+      <div class="card" style="padding:20px;text-align:center;border-color:#FEE2E2;animation:slideUp 0.35s ease">
         <div style="width:52px;height:52px;background:#FEF2F2;border-radius:16px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center">
           ${icon('xCircle', 28, '#DC2626')}
         </div>
@@ -1001,6 +1147,7 @@ function renderTrackingDetail(shipment) {
   const el = document.getElementById('screen-tracking-detail');
   if (!el) return;
 
+  const destinationRelay = shipment.destination_relay || (State.relayPoints || []).find(r => r.id === shipment.destination_relay_id || String(r.id) === String(shipment.destination_relay_id));
   const badge = getStatusBadge(shipment.current_status);
   const trackingInfo = getTrackingInfo(shipment);
   const progress = trackingInfo.progress;
@@ -1108,7 +1255,7 @@ function renderTrackingDetail(shipment) {
     </div>
 
     <!-- Relay info -->
-    ${shipment.destination_relay ? `
+    ${destinationRelay ? `
       <div class="divider-soft"></div>
       <div style="padding:16px">
         <div style="font-size:14px;font-weight:700;color:#1A1A1A;margin-bottom:12px">Relais de livraison</div>
@@ -1118,14 +1265,14 @@ function renderTrackingDetail(shipment) {
               ${icon('store', 20, 'white')}
             </div>
             <div style="flex:1">
-              <div style="font-size:14px;font-weight:700;color:#1A1A1A">${shipment.destination_relay.name}</div>
-              <div style="font-size:12px;color:#6B7280;margin-top:2px">${shipment.destination_relay.address}</div>
-              <div style="font-size:12px;color:#6B7280">${shipment.destination_relay.commune}</div>
-              ${shipment.destination_relay.hours ? `<div style="font-size:11px;color:#FF6C00;margin-top:4px;font-weight:600">${icon('clock', 11, '#FF6C00')} ${shipment.destination_relay.hours}</div>` : ''}
+              <div style="font-size:14px;font-weight:700;color:#1A1A1A">${destinationRelay.name}</div>
+              <div style="font-size:12px;color:#6B7280;margin-top:2px">${destinationRelay.address || ''}</div>
+              <div style="font-size:12px;color:#6B7280">${destinationRelay.commune || ''}</div>
+              ${destinationRelay.hours ? `<div style="font-size:11px;color:#FF6C00;margin-top:4px;font-weight:600">${icon('clock', 11, '#FF6C00')} ${destinationRelay.hours}</div>` : ''}
             </div>
           </div>
           <div style="display:flex;gap:8px">
-            <a href="tel:${shipment.destination_relay.phone}" class="btn btn-sm btn-secondary" style="flex:1;font-size:12px;text-decoration:none">
+            <a href="tel:${destinationRelay.phone || ''}" class="btn btn-sm btn-secondary" style="flex:1;font-size:12px;text-decoration:none">
               ${icon('phone', 14, '#FF6C00')} Appeler
             </a>
             <button class="btn btn-sm btn-outline" style="flex:1;font-size:12px" onclick="Router.navigate('map')">
@@ -1192,7 +1339,7 @@ function generateBordereau(code) {
   // Simulate PDF generation
   const win = window.open('', '_blank');
   if (win) {
-    const s = DEMO_SHIPMENTS.find(x => x.shipment_code === code);
+    const s = (State.shipments || []).find(x => x.shipment_code === code);
     win.document.write(`
       <html><head><title>Bordereau ColisDirect — ${code}</title>
       <style>body{font-family:sans-serif;padding:32px;color:#1A1A1A}
@@ -1228,7 +1375,7 @@ function generateBordereau(code) {
 }
 
 function promptCancelShipment(id) {
-  const s = DEMO_SHIPMENTS.find(x => x.id === id);
+  const s = (State.shipments || []).find(x => x.id === id || String(x.id) === String(id));
   if (!s) return;
   Sheet.open(`
     <div style="text-align:center;padding:8px 0 8px">
@@ -1246,12 +1393,18 @@ function promptCancelShipment(id) {
   `, 'Annulation');
 }
 
-function confirmCancel(id) {
-  const s = DEMO_SHIPMENTS.find(x => x.id === id);
-  if (s) {
-    s.current_status = 'CANCELLED';
-    s.events.unshift({ status: 'CANCELLED', timestamp: new Date().toISOString(), notes: 'Annulé par l\'expéditeur' });
+async function confirmCancel(id) {
+  const s = (State.shipments || []).find(x => x.id === id || String(x.id) === String(id));
+  if (!s) return;
+  const { data, error } = await API.cancelShipment(s.tracking_number);
+  if (error) {
+    Toast.show(`Impossible d'annuler : ${error}`, 'error');
+    Sheet.close();
+    return;
   }
+  s.current_status = 'CANCELLED';
+  if (!s.events) s.events = [];
+  s.events.unshift({ status: 'CANCELLED', timestamp: new Date().toISOString(), notes: 'Annulé par l\'expéditeur' });
   Sheet.close();
   Toast.show('Commande annulée. Remboursement en cours.', 'success', 4000);
   Router.navigate('shipments');
@@ -1266,6 +1419,9 @@ function renderProfile() {
     el.innerHTML = `
       <div class="app-header">
         <div style="font-size:17px;font-weight:700;color:#1A1A1A;flex:1">Mon profil</div>
+        <button class="header-action" onclick="Router.navigate('settings')">
+          ${icon('settings', 18)}
+        </button>
       </div>
       <div class="empty-state" style="padding-top:60px">
         <div style="margin-bottom:16px">${LOGO_SMALL}</div>
@@ -1302,8 +1458,9 @@ function renderProfile() {
   }
 
   const initials = ((State.user.first_name || '')[0] || '') + ((State.user.last_name || '')[0] || '');
-  const allCount = DEMO_SHIPMENTS.length;
-  const deliveredCount = DEMO_SHIPMENTS.filter(s => ['PICKED_UP_BY_CUSTOMER','DELIVERED','DELIVERED_TO_CUSTOMER'].includes(s.current_status)).length;
+  const shipments = State.shipments || [];
+  const allCount = shipments.length;
+  const deliveredCount = shipments.filter(s => ['PICKED_UP_BY_CUSTOMER','DELIVERED','DELIVERED_TO_CUSTOMER'].includes(s.current_status)).length;
 
   el.innerHTML = `
     <div class="app-header">
@@ -1448,7 +1605,7 @@ function showAddressBook() {
         <div style="font-size:15px;font-weight:600;color:#6B7280;margin-top:12px">Aucune adresse sauvegardée</div>
         <div style="font-size:13px;color:#9CA3AF;margin-top:4px">Vos adresses fréquentes apparaîtront ici</div>
       </div>
-      <button class="btn btn-primary btn-full" onclick="Sheet.close();Router.navigate('create-shipment')">
+      <button class="btn btn-primary btn-full" onclick="Sheet.close();navigateToCreateShipment()">
         ${icon('plus', 16)} Créer un envoi
       </button>
     </div>
@@ -1456,9 +1613,13 @@ function showAddressBook() {
 }
 
 function showPaymentHistory() {
+  const shipments = State.shipments || [];
+  const paidShipments = shipments.filter(s => s.payment_status === 'paid');
   Sheet.open(`
     <div style="padding:4px 0 16px">
-      ${DEMO_SHIPMENTS.filter(s => s.payment_status === 'paid').map(s => `
+      ${paidShipments.length === 0 ? `
+        <div style="text-align:center;padding:24px;color:#6B7280;font-size:13px">Aucun paiement effectué.</div>
+      ` : paidShipments.map(s => `
         <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #F6F7F9">
           <div style="width:38px;height:38px;background:#E6F6EC;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
             ${icon('creditCard', 18, '#16A34A')}
@@ -1509,9 +1670,7 @@ function handleLogout() {
 }
 
 function doLogout() {
-  State.user = null;
-  localStorage.removeItem('cd_token');
-  State.save();
+  State.clear();
   Sheet.close();
   Router.navigate('home');
   Toast.show('Vous êtes déconnecté(e)', 'success');
@@ -1757,8 +1916,11 @@ function togglePwd() {
     const el = document.getElementById(id);
     if (el) el.type = showPwd ? 'text' : 'password';
   });
-  // Update eye icon button
-  renderLogin();
+  // Update eye icon buttons directly in the DOM to avoid destroying and recreating inputs
+  const toggleButtons = document.querySelectorAll('button[onclick="togglePwd()"]');
+  toggleButtons.forEach(btn => {
+    btn.innerHTML = icon(showPwd ? 'eyeOff' : 'eye', 18, '#6B7280');
+  });
 }
 
 function showLoginError(msg) {
@@ -1806,6 +1968,7 @@ async function submitLogin() {
     localStorage.setItem('cd_token', data.token || data.access_token || '');
     State.user = data.user || data;
     State.save();
+    State.loadAllData();
     Router.navigate('home');
     Toast.show(`Bienvenue, ${State.user.first_name} !`, 'success');
   }
@@ -1955,7 +2118,42 @@ function saveStep2Inputs() {
   }
 }
 
+async function loadPricing(key) {
+  try {
+    const qs = new URLSearchParams({
+      sender_commune: createData.sender_commune || '',
+      recipient_commune: createData.recipient_commune || '',
+      package_size: createData.grid_type === 'courier' ? 'courrier' : (createData.package_type || 'petit'),
+      grid_type: createData.grid_type || 'colis',
+      weight: String(createData.weight || 0),
+    }).toString();
+    const { data } = await API.request('GET', '/api/pricing-grids/calculate?' + qs);
+    if (data && Array.isArray(data.modes)) {
+      State.pricing = data;
+      State.pricingKey = key;
+      const contentEl = document.getElementById('cs-content');
+      if (contentEl && typeof createStep !== 'undefined' && createStep === 2) contentEl.innerHTML = stepDeliveryMode();
+    }
+  } catch (e) { /* garder l'estimation locale */ }
+}
+
 function calculatePrice(pickupMethod, homeDelivery) {
+  // Prix serveur = source de verite, identique a la facturation backend (POST /shipments).
+  // GET /api/pricing-grids/calculate. Fallback sur l'estimation locale ci-dessous si hors-ligne.
+  const __pk = [createData.sender_commune, createData.recipient_commune, createData.grid_type, createData.package_type, createData.weight].join('|');
+  if (createData.sender_commune && createData.recipient_commune) {
+    if (State.pricing && State.pricingKey === __pk) {
+      const __mk = pickupMethod === 'home_pickup'
+        ? (homeDelivery ? 'home_to_home' : 'home_to_relay')
+        : (homeDelivery ? 'relay_to_home' : 'relay_to_relay');
+      const __m = (State.pricing.modes || []).find(x => x.key === __mk);
+      if (__m) return __m.final_price_fcfa;
+    } else if (State.pricingKey !== __pk) {
+      State.pricingKey = __pk;
+      State.pricing = null;
+      loadPricing(__pk);
+    }
+  }
   const isIntra = createData.sender_commune === createData.recipient_commune;
   let basePrice = 0;
   
@@ -1973,7 +2171,7 @@ function calculatePrice(pickupMethod, homeDelivery) {
   const fragileFee = createData.is_fragile ? 500 : 0;
   const insuredFee = createData.is_insured ? 500 : 0;
   const pickupFee = pickupMethod === 'home_pickup' ? 500 : 0;
-  const deliveryFee = homeDelivery ? 500 : 0;
+  const deliveryFee = homeDelivery ? 1000 : 0;
   
   return basePrice + fragileFee + insuredFee + pickupFee + deliveryFee;
 }
@@ -2153,9 +2351,9 @@ function stepInformations() {
         ${gridType === 'colis' ? `
           <div class="form-group"><label class="form-label">Taille du colis *</label>
             <select class="form-select" id="c-size" onchange="updatePackageSize(this.value)">
-              <option value="petit" ${size==='petit'?'selected':''}>Petit (≤ 2 kg)</option>
-              <option value="moyen" ${size==='moyen'?'selected':''}>Moyen (2–10 kg)</option>
-              <option value="grand" ${size==='grand'?'selected':''}>Grand (> 10 kg)</option>
+              <option value="petit" ${size==='petit'?'selected':''}>Petit (≤ 5 kg)</option>
+              <option value="moyen" ${size==='moyen'?'selected':''}>Moyen (5–15 kg)</option>
+              <option value="grand" ${size==='grand'?'selected':''}>Grand (15–30 kg)</option>
             </select></div>
         ` : ''}
         <div class="form-group"><label class="form-label">Poids (kg) *</label>
@@ -2340,10 +2538,13 @@ function toggleOption(optKey) {
 }
 
 function openAddressBook() {
+  const addresses = State.recipientAddresses || [];
   const content = `
     <div style="display:flex;flex-direction:column;gap:12px;padding:8px 0 16px">
       <div style="font-size:13px;color:#6B7280;margin-bottom:8px">Sélectionnez un destinataire enregistré pour pré-remplir le formulaire.</div>
-      ${DEMO_RECIPIENT_ADDRESSES.map((addr) => `
+      ${addresses.length === 0 ? `
+        <div style="text-align:center;padding:24px;color:#6B7280;font-size:13px">Aucun destinataire enregistré.</div>
+      ` : addresses.map((addr) => `
         <div onclick="selectRecipientFromBook('${addr.id}')" style="background:#fff;border:1px solid #E6E6E6;border-radius:14px;padding:14px;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;gap:4px" onmouseover="this.style.borderColor='#FF6C00';this.style.background='#FFF3E8'" onmouseout="this.style.borderColor='#E6E6E6';this.style.background='#fff'">
           <div style="display:flex;align-items:center;justify-content:space-between">
             <span style="font-size:14px;font-weight:800;color:#1A1A1A">${addr.first_name} ${addr.last_name}</span>
@@ -2353,7 +2554,7 @@ function openAddressBook() {
             ${icon('phone', 11, '#6B7280')} +225 ${addr.phone}
           </div>
           <div style="font-size:12px;color:#6B7280;display:flex;align-items:center;gap:4px">
-            ${icon('home', 11, '#6B7280')} ${addr.quartier}, ${addr.address}
+            ${icon('home', 11, '#6B7280')} ${addr.quartier || ''}, ${addr.address || ''}
           </div>
         </div>
       `).join('')}
@@ -2364,7 +2565,7 @@ function openAddressBook() {
 }
 
 function selectRecipientFromBook(addrId) {
-  const addr = DEMO_RECIPIENT_ADDRESSES.find(a => a.id === addrId);
+  const addr = (State.recipientAddresses || []).find(a => a.id === addrId || String(a.id) === String(addrId));
   if (!addr) return;
   
   createData.recipient_first_name = addr.first_name;
@@ -2385,48 +2586,33 @@ function selectRecipientFromBook(addrId) {
 }
 
 function stepRelaySelection() {
-  const showOrigin = createData.pickup_method === 'relay_deposit';
+  const showOrigin = false; // Ne pas choisir de relai de départ car dépôt libre
   const showDest = !createData.home_delivery;
 
   const senderCommune = createData.sender_commune || '';
   const recipientCommune = createData.recipient_commune || '';
 
-  const matchedOrigin = DEMO_RELAY_POINTS.find(r => r.commune.toLowerCase().includes(senderCommune.toLowerCase())) || DEMO_RELAY_POINTS[0];
-  const matchedDest = DEMO_RELAY_POINTS.find(r => r.commune.toLowerCase().includes(recipientCommune.toLowerCase())) || DEMO_RELAY_POINTS[4] || DEMO_RELAY_POINTS[0];
+  const relayPoints = State.relayPoints || [];
+  const matchedDest = relayPoints.find(r => r.commune.toLowerCase().includes(recipientCommune.toLowerCase())) || relayPoints[0] || { id: '', name: 'Aucun relais', address: '', hours: '' };
 
-  if (showOrigin && !createData.origin_relay_id) {
-    createData.origin_relay_id = matchedOrigin.id;
-  }
-  if (showDest && !createData.destination_relay_id) {
+  createData.origin_relay_id = null; // Aucun relais d'origine présélectionné pour le dépôt libre
+
+  if (showDest && !createData.destination_relay_id && matchedDest.id) {
     createData.destination_relay_id = matchedDest.id;
   }
 
-  const originRelay = DEMO_RELAY_POINTS.find(r => r.id === createData.origin_relay_id) || matchedOrigin;
-  const destRelay = DEMO_RELAY_POINTS.find(r => r.id === createData.destination_relay_id) || matchedDest;
+  const destRelay = relayPoints.find(r => r.id === createData.destination_relay_id) || matchedDest;
 
   return `
     <div style="font-size:14px;font-weight:700;color:#FF6C00;margin-bottom:8px">Sélection des points relais</div>
 
-    ${showOrigin ? `
-      <div style="background:#F6F7F9;border-radius:16px;padding:16px;margin-bottom:14px">
-        <div style="font-size:15px;font-weight:800;color:#1A1A1A;margin-bottom:4px;display:flex;align-items:center;gap:6px">
-          ${icon('store', 18, '#FF6C00')} Relais de départ
-        </div>
-        <div style="font-size:12px;color:#6B7280;margin-bottom:12px">Où souhaitez-vous déposer votre colis ?</div>
-        
-        <div class="form-group" style="margin-bottom:12px">
-          <select class="form-input" id="c-origin-relay-select" onchange="createData.origin_relay_id=this.value;document.getElementById('cs-content').innerHTML=stepRelaySelection()" style="font-weight:700;color:#1A1A1A;border-color:#FF6C00">
-            ${DEMO_RELAY_POINTS.map(r => `
-              <option value="${r.id}" ${r.id === originRelay.id ? 'selected' : ''}>${r.name} (${r.commune})</option>
-            `).join('')}
-          </select>
-        </div>
-
-        <div style="background:#fff;border-radius:12px;padding:12px;border:1px solid #E6E6E6;margin-top:8px">
-          <div style="font-size:13px;font-weight:700;color:#1A1A1A">${originRelay.name}</div>
-          <div style="font-size:12px;color:#6B7280;margin-top:2px">${originRelay.address}</div>
-          <div style="font-size:11px;color:#FF6C00;margin-top:4px;font-weight:600;display:flex;align-items:center;gap:4px">
-            ${icon('clock', 12, '#FF6C00')} ${originRelay.hours}
+    ${createData.pickup_method === 'relay_deposit' ? `
+      <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:16px;padding:16px;margin-bottom:14px;display:flex;gap:10px;align-items:start">
+        <div style="font-size:16px;margin-top:2px">ℹ️</div>
+        <div>
+          <div style="font-size:13px;font-weight:800;color:#1E40AF;margin-bottom:3px">Dépôt libre dans tout le réseau</div>
+          <div style="font-size:11px;color:#1E3A8A;line-height:1.4">
+            Vous n'avez pas besoin de choisir de point relais de départ. Vous pouvez déposer votre colis dans n'importe quel point relais ColisDirect. Votre colis sera pris en charge et scanné sur place par l'agent.
           </div>
         </div>
       </div>
@@ -2441,7 +2627,7 @@ function stepRelaySelection() {
         
         <div class="form-group" style="margin-bottom:12px">
           <select class="form-input" id="c-dest-relay-select" onchange="createData.destination_relay_id=this.value;document.getElementById('cs-content').innerHTML=stepRelaySelection()" style="font-weight:700;color:#1A1A1A;border-color:#FF6C00">
-            ${DEMO_RELAY_POINTS.map(r => `
+            ${relayPoints.map(r => `
               <option value="${r.id}" ${r.id === destRelay.id ? 'selected' : ''}>${r.name} (${r.commune})</option>
             `).join('')}
           </select>
@@ -2449,9 +2635,9 @@ function stepRelaySelection() {
 
         <div style="background:#fff;border-radius:12px;padding:12px;border:1px solid #E6E6E6;margin-top:8px">
           <div style="font-size:13px;font-weight:700;color:#1A1A1A">${destRelay.name}</div>
-          <div style="font-size:12px;color:#6B7280;margin-top:2px">${destRelay.address}</div>
+          <div style="font-size:12px;color:#6B7280;margin-top:2px">${destRelay.address || ''}</div>
           <div style="font-size:11px;color:#FF6C00;margin-top:4px;font-weight:600;display:flex;align-items:center;gap:4px">
-            ${icon('clock', 12, '#FF6C00')} ${destRelay.hours}
+            ${icon('clock', 12, '#FF6C00')} ${destRelay.hours || 'Lun–Sam 8h–20h'}
           </div>
         </div>
       </div>
@@ -2474,14 +2660,14 @@ function stepSummary() {
       grand: isIntra ? 2000 : 2500
     };
     basePrice = prices[createData.package_type || 'petit'];
-    const sizeLabels = { petit: 'Petit (< 3kg)', moyen: 'Moyen (3–10kg)', grand: 'Grand (> 10kg)' };
+    const sizeLabels = { petit: 'Petit (≤ 5 kg)', moyen: 'Moyen (5–15 kg)', grand: 'Grand (15–30 kg)' };
     baseLabel = 'Colis ' + sizeLabels[createData.package_type || 'petit'];
   }
   
   const fragileFee = createData.is_fragile ? 500 : 0;
   const insuredFee = createData.is_insured ? 500 : 0;
   const pickupFee = createData.pickup_method === 'home_pickup' ? 500 : 0;
-  const deliveryFee = createData.home_delivery ? 500 : 0;
+  const deliveryFee = createData.home_delivery ? 1000 : 0;
   const total = calculatePrice(createData.pickup_method, createData.home_delivery);
   const payment = createData.payment_method || 'paystack';
 
@@ -2635,46 +2821,64 @@ async function submitShipment() {
   const btn = document.querySelector('#screen-create-shipment .btn-primary:last-child');
   if (btn) { btn.innerHTML = `<div class="spinner" style="width:20px;height:20px;border-width:2px;border-top-color:#fff;border-color:rgba(255,255,255,0.3)"></div> Création en cours…`; btn.disabled = true; }
 
-  await new Promise(r => setTimeout(r, 1400));
-
   const finalPrice = calculatePrice(createData.pickup_method, createData.home_delivery);
 
-  const code = Math.floor(1000 + Math.random() * 9000) + ['AB','CD','EF','GH'][Math.floor(Math.random()*4)];
-  const trackingNum = 'CD' + Date.now().toString().slice(-10) + 'CI';
-  const newS = {
-    id: String(Date.now()),
-    tracking_number: trackingNum,
-    shipment_code: code,
-    ...JSON.parse(JSON.stringify(createData)),
-    current_status: 'READY_FOR_DROP_OFF',
-    payment_status: createData.payment_method === 'relay_cash' ? 'pending' : 'paid',
-    price: finalPrice,
+  const payload = {
+    sender_first_name: createData.sender_first_name,
+    sender_last_name: createData.sender_last_name,
+    sender_email: createData.sender_email || null,
+    sender_phone: createData.sender_phone,
+    sender_commune: createData.sender_commune,
+    sender_quartier: createData.sender_quartier,
+    sender_address: createData.sender_address,
+    sender_repere: createData.sender_repere || null,
+    recipient_first_name: createData.recipient_first_name,
+    recipient_last_name: createData.recipient_last_name,
+    recipient_email: createData.recipient_email || null,
+    recipient_phone: createData.recipient_phone,
+    recipient_commune: createData.recipient_commune,
+    recipient_quartier: createData.recipient_quartier,
+    recipient_address: createData.recipient_address,
+    recipient_repere: createData.recipient_repere || null,
+    package_type: createData.package_type || (createData.grid_type === 'courier' ? 'courrier' : 'petit'),
     weight: createData.grid_type === 'courier' ? (createData.weight || 0.5) : (createData.weight || 5),
-    created_at: new Date().toISOString(),
-    events: [{ status: 'READY_FOR_DROP_OFF', timestamp: new Date().toISOString(), notes: 'Commande créée et paiement validé' }],
+    price: finalPrice,
+    payment_method: createData.payment_method,
+    pickup_method: createData.pickup_method || 'relay_deposit',
+    home_delivery: !!createData.home_delivery,
+    origin_relay_id: createData.pickup_method === 'home_pickup' ? null : (createData.origin_relay_id || null),
+    destination_relay_id: createData.home_delivery ? null : (createData.destination_relay_id || null),
   };
-  if (createData.pickup_method === 'relay_deposit') {
-    newS.origin_relay = DEMO_RELAY_POINTS.find(r => r.id === createData.origin_relay_id) || DEMO_RELAY_POINTS[0];
+
+  const { data, error } = await API.createShipment(payload);
+  if (error) {
+    Toast.show(`Erreur lors de la création : ${error}`, 'error');
+    if (btn) { btn.innerHTML = `${icon('checkCircle', 18)} Confirmer l'envoi`; btn.disabled = false; }
+    return;
   }
-  if (!createData.home_delivery) {
-    newS.destination_relay = DEMO_RELAY_POINTS.find(r => r.id === createData.destination_relay_id) || DEMO_RELAY_POINTS[4] || DEMO_RELAY_POINTS[0];
+
+  if (data) {
+    if (State.shipments) {
+      State.shipments.unshift(data);
+    } else {
+      State.shipments = [data];
+    }
+
+    // Notification
+    State.notifications.unshift({
+      id: Date.now(), type: 'created', title: 'Nouveau colis créé',
+      body: `Votre colis ${data.shipment_code} vers ${data.recipient_commune} a bien été créé. Déposez-le dès que possible.`,
+      time: 'À l\'instant', unread: true, icon: 'packageCheck', color: '#FF6C00', bg: '#FFF3E8',
+    });
+    State.save();
+
+    // Reset
+    createStep = 1;
+    Object.keys(createData).forEach(k => delete createData[k]);
+
+    Router.navigate('tracking-detail', { shipment: data });
+    Toast.show(`✓ Colis ${data.shipment_code} créé ! Déposez-le dans un relais.`, 'success', 5000);
   }
-  DEMO_SHIPMENTS.unshift(newS);
-
-  // Notification
-  State.notifications.unshift({
-    id: Date.now(), type: 'created', title: 'Nouveau colis créé',
-    body: `Votre colis ${code} vers ${createData.recipient_commune} a bien été créé. Déposez-le dès que possible.`,
-    time: 'À l\'instant', unread: true, icon: 'packageCheck', color: '#FF6C00', bg: '#FFF3E8',
-  });
-  State.save();
-
-  // Reset
-  createStep = 1;
-  Object.keys(createData).forEach(k => delete createData[k]);
-
-  Router.navigate('tracking-detail', { shipment: newS });
-  Toast.show(`✓ Colis ${code} créé ! Déposez-le dans un relais.`, 'success', 5000);
 }
 
 /* ── MAP (RELAY POINTS) ────────────────────────────────────────── */
@@ -2684,9 +2888,10 @@ function renderMap() {
   const el = document.getElementById('screen-map');
   if (!el) return;
 
+  const relayPoints = State.relayPoints || [];
   const filtered = relaySearchQ
-    ? DEMO_RELAY_POINTS.filter(r => r.name.toLowerCase().includes(relaySearchQ.toLowerCase()) || r.commune.toLowerCase().includes(relaySearchQ.toLowerCase()))
-    : DEMO_RELAY_POINTS;
+    ? relayPoints.filter(r => r.name.toLowerCase().includes(relaySearchQ.toLowerCase()) || r.commune.toLowerCase().includes(relaySearchQ.toLowerCase()))
+    : relayPoints;
 
   el.innerHTML = `
     <div class="app-header">
@@ -2714,17 +2919,20 @@ function renderMap() {
         <line x1="120" y1="0" x2="120" y2="220" stroke="rgba(255,255,255,0.5)" stroke-width="2"/>
         <line x1="310" y1="0" x2="310" y2="220" stroke="rgba(255,255,255,0.5)" stroke-width="2"/>
         <!-- Relay pins -->
-        ${[{x:215,y:110,main:true},{x:120,y:60,main:false},{x:310,y:75,main:false},{x:80,y:160,main:false},{x:350,y:150,main:false},{x:185,y:35,main:false}].map((p,i) => `
-          <g onclick="showRelayDetail('${i+1}')">
-            <circle cx="${p.x}" cy="${p.y}" r="${p.main?18:13}" fill="#FF6C00" opacity="${p.main?1:0.85}" style="cursor:pointer"/>
-            <circle cx="${p.x}" cy="${p.y}" r="${p.main?22:16}" fill="#FF6C00" opacity="0.2"/>
-            <text x="${p.x}" y="${p.y+5}" text-anchor="middle" font-size="${p.main?12:9}" fill="white" font-weight="700">📦</text>
-          </g>
-        `).join('')}
+        ${filtered.slice(0, 6).map((r, i) => {
+          const coords = [{x:215,y:110,main:true},{x:120,y:60,main:false},{x:310,y:75,main:false},{x:80,y:160,main:false},{x:350,y:150,main:false},{x:185,y:35,main:false}][i] || {x: 100 + i * 20, y: 100, main: false};
+          return `
+            <g onclick="showRelayDetail('${r.id}')">
+              <circle cx="${coords.x}" cy="${coords.y}" r="${coords.main?18:13}" fill="#FF6C00" opacity="${coords.main?1:0.85}" style="cursor:pointer"/>
+              <circle cx="${coords.x}" cy="${coords.y}" r="${coords.main?22:16}" fill="#FF6C00" opacity="0.2"/>
+              <text x="${coords.x}" y="${coords.y+5}" text-anchor="middle" font-size="${coords.main?12:9}" fill="white" font-weight="700">📦</text>
+            </g>
+          `;
+        }).join('')}
       </svg>
       <!-- Counter badge -->
       <div style="position:absolute;bottom:10px;right:10px;background:#fff;border-radius:10px;padding:6px 12px;font-size:12px;font-weight:700;color:#1A1A1A;box-shadow:0 2px 10px rgba(0,0,0,0.15);display:flex;align-items:center;gap:6px">
-        ${icon('mapPin', 13, '#FF6C00')} ${DEMO_RELAY_POINTS.length} relais
+        ${icon('mapPin', 13, '#FF6C00')} ${relayPoints.length} relais
       </div>
     </div>
 
@@ -2740,19 +2948,19 @@ function renderMap() {
         : filtered.map(r => `
           <div class="relay-card" onclick="showRelayDetail('${r.id}')">
             <div style="display:flex;align-items:center;gap:4px;flex-direction:column;margin-top:4px">
-              <div class="relay-dot" style="background:${r.status === 'open' ? '#16A34A' : '#DC2626'}"></div>
+              <div class="relay-dot" style="background:#16A34A"></div>
             </div>
             <div style="flex:1;min-width:0">
               <div style="font-size:14px;font-weight:700;color:#1A1A1A">${r.name}</div>
-              <div style="font-size:12px;color:#6B7280;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.address}</div>
+              <div style="font-size:12px;color:#6B7280;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.address || ''}</div>
               <div style="display:flex;align-items:center;gap:8px;margin-top:5px">
-                <span class="badge ${r.status === 'open' ? 'badge-green' : 'badge-red'}" style="font-size:9px;padding:2px 7px">${r.status === 'open' ? 'Ouvert' : 'Fermé'}</span>
-                <span style="font-size:11px;color:#6B7280">${r.hours}</span>
+                <span class="badge badge-green" style="font-size:9px;padding:2px 7px">Ouvert</span>
+                <span style="font-size:11px;color:#6B7280">${r.hours || 'Lun–Sam 8h–20h'}</span>
               </div>
             </div>
             <div style="text-align:right;flex-shrink:0">
-              <div style="font-size:12px;font-weight:700;color:#FF6C00">${r.distance}</div>
-              <div style="font-size:10px;color:#9CA3AF;margin-top:2px">${r.packages_count} colis</div>
+              <div style="font-size:12px;font-weight:700;color:#FF6C00">${r.commune || ''}</div>
+              <div style="font-size:10px;color:#9CA3AF;margin-top:2px">${r.phone || ''}</div>
             </div>
             ${icon('chevronRight', 16, '#D1D5DB')}
           </div>
@@ -2764,22 +2972,29 @@ function renderMap() {
 function filterRelays(q) {
   relaySearchQ = q;
   const lq = q.toLowerCase();
+  const relayPoints = State.relayPoints || [];
   const filtered = q
-    ? DEMO_RELAY_POINTS.filter(r => r.name.toLowerCase().includes(lq) || r.commune.toLowerCase().includes(lq))
-    : DEMO_RELAY_POINTS;
+    ? relayPoints.filter(r => r.name.toLowerCase().includes(lq) || r.commune.toLowerCase().includes(lq))
+    : relayPoints;
   const container = document.getElementById('relay-list');
   if (!container) return;
   container.innerHTML = filtered.length === 0
     ? `<div class="empty-state"><div class="empty-title" style="font-size:14px;color:#6B7280">Aucun relais pour "${q}"</div></div>`
     : filtered.map(r => `
       <div class="relay-card" onclick="showRelayDetail('${r.id}')">
-        <div class="relay-dot" style="background:${r.status === 'open' ? '#16A34A' : '#DC2626'};margin-top:4px"></div>
+        <div class="relay-dot" style="background:#16A34A;margin-top:4px"></div>
         <div style="flex:1">
           <div style="font-size:14px;font-weight:700;color:#1A1A1A">${r.name}</div>
-          <div style="font-size:12px;color:#6B7280">${r.address}</div>
-          <div style="margin-top:4px"><span class="badge ${r.status === 'open' ? 'badge-green' : 'badge-red'}" style="font-size:9px">${r.status === 'open' ? 'Ouvert' : 'Fermé'}</span></div>
+          <div style="font-size:12px;color:#6B7280">${r.address || ''}</div>
+          <div style="margin-top:4px">
+            <span class="badge badge-green" style="font-size:9px">Ouvert</span>
+            <span style="font-size:11px;color:#6B7280;margin-left:6px">${r.hours || 'Lun–Sam 8h–20h'}</span>
+          </div>
         </div>
-        <div style="text-align:right"><div style="font-size:12px;font-weight:700;color:#FF6C00">${r.distance}</div></div>
+        <div style="text-align:right">
+          <div style="font-size:12px;font-weight:700;color:#FF6C00">${r.commune || ''}</div>
+          <div style="font-size:10px;color:#9CA3AF;margin-top:2px">${r.phone || ''}</div>
+        </div>
         ${icon('chevronRight', 16, '#D1D5DB')}
       </div>
     `).join('');
@@ -2797,7 +3012,7 @@ function locateMe() {
 }
 
 function showRelayDetail(id) {
-  const relay = DEMO_RELAY_POINTS.find(r => r.id === id);
+  const relay = (State.relayPoints || []).find(r => r.id === id || String(r.id) === String(id));
   if (!relay) return;
   Sheet.open(`
     <div style="padding:4px 0 16px">
@@ -2807,30 +3022,29 @@ function showRelayDetail(id) {
         </div>
         <div style="flex:1">
           <div style="font-size:15px;font-weight:800;color:#1A1A1A">${relay.name}</div>
-          <div style="font-size:12px;color:#6B7280;margin-top:2px">${relay.address}</div>
+          <div style="font-size:12px;color:#6B7280;margin-top:2px">${relay.address || ''}</div>
           <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
-            <span class="badge ${relay.status === 'open' ? 'badge-green' : 'badge-red'}" style="font-size:10px">${relay.status === 'open' ? 'Ouvert maintenant' : 'Fermé'}</span>
+            <span class="badge badge-green" style="font-size:10px">Ouvert maintenant</span>
           </div>
         </div>
       </div>
 
       <div class="card" style="padding:0 14px;margin-bottom:16px">
-        <div class="info-row"><span class="info-key">Horaires</span><span class="info-val">${relay.hours}</span></div>
-        <div class="info-row"><span class="info-key">Téléphone</span><a href="tel:${relay.phone}" style="font-size:13px;font-weight:600;color:#FF6C00">${relay.phone}</a></div>
-        <div class="info-row"><span class="info-key">Distance</span><span class="info-val">${relay.distance}</span></div>
-        <div class="info-row" style="border:none"><span class="info-key">Colis en attente</span><span class="info-val">${relay.packages_count}</span></div>
+        <div class="info-row"><span class="info-key">Horaires</span><span class="info-val">${relay.hours || 'Lun–Sam 8h–20h'}</span></div>
+        <div class="info-row"><span class="info-key">Téléphone</span><a href="tel:${relay.phone || ''}" style="font-size:13px;font-weight:600;color:#FF6C00">${relay.phone || 'Non renseigné'}</a></div>
+        <div class="info-row" style="border:none"><span class="info-key">Commune</span><span class="info-val">${relay.commune || ''}</span></div>
       </div>
 
       <div style="display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;gap:8px">
-          <a href="tel:${relay.phone}" class="btn btn-secondary btn-full" style="text-decoration:none">
+          <a href="tel:${relay.phone || ''}" class="btn btn-secondary btn-full" style="text-decoration:none">
             ${icon('phone', 16, '#FF6C00')} Appeler
           </a>
           <button class="btn btn-outline btn-full" onclick="Sheet.close();Toast.show('Navigation en cours…','default')">
             ${icon('navigation', 16)} Itinéraire
           </button>
         </div>
-        <button class="btn btn-primary btn-full" onclick="Sheet.close();Router.navigate('create-shipment')">
+        <button class="btn btn-primary btn-full" onclick="Sheet.close();navigateToCreateShipment()">
           ${icon('package', 16)} Envoyer un colis ici
         </button>
         <button class="btn btn-ghost btn-full" onclick="Sheet.close()">Fermer</button>
@@ -2840,17 +3054,18 @@ function showRelayDetail(id) {
 }
 
 /* ── PRICING ───────────────────────────────────────────────────── */
-let pricingTab = 'relay';
+let pricingTab = 'intra';
 
 function renderPricing() {
   const el = document.getElementById('screen-pricing');
   if (!el) return;
 
   const tarifs = [
-    { icon: '📦', name: 'Petit colis',  weight: '< 3 kg',    relay: 600,     home: 1100 },
-    { icon: '🗃️', name: 'Colis moyen', weight: '3 – 10 kg',  relay: 1500,    home: 2000 },
-    { icon: '📫', name: 'Grand colis',  weight: '10 – 30 kg', relay: 2500,    home: 3500 },
-    { icon: '🏗️', name: 'Hors norme',  weight: '> 30 kg',    relay: 'Devis', home: 'Devis' },
+    { icon: '✉️', name: 'Courrier',     weight: '< 2 kg',     intra: 600,     inter: 1000 },
+    { icon: '📦', name: 'Petit colis',  weight: '< 3 kg',     intra: 1000,    inter: 1500 },
+    { icon: '🗃️', name: 'Colis moyen', weight: '3 – 10 kg',  intra: 1500,    inter: 2000 },
+    { icon: '📫', name: 'Grand colis',  weight: '10 – 30 kg', intra: 2000,    inter: 2500 },
+    { icon: '🏗️', name: 'Hors norme',  weight: '> 30 kg',    intra: 'Devis', inter: 'Devis' },
   ];
 
   el.innerHTML = `
@@ -2869,11 +3084,11 @@ function renderPricing() {
     <!-- Tab -->
     <div style="padding:14px 16px 8px">
       <div style="display:flex;background:#F6F7F9;border-radius:14px;padding:4px">
-        <button id="pt-relay" onclick="setPricingTab('relay')" style="flex:1;padding:10px;border-radius:10px;border:none;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.15s;${pricingTab==='relay'?'background:#fff;color:#1A1A1A;box-shadow:0 1px 4px rgba(0,0,0,0.1)':'background:transparent;color:#6B7280'}">
-          ${icon('store', 14, pricingTab==='relay'?'#FF6C00':'#6B7280')} Point relais
+        <button id="pt-intra" onclick="setPricingTab('intra')" style="flex:1;padding:10px;border-radius:10px;border:none;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.15s;${pricingTab==='intra'?'background:#fff;color:#1A1A1A;box-shadow:0 1px 4px rgba(0,0,0,0.1)':'background:transparent;color:#6B7280'}">
+          ${icon('mapPin', 14, pricingTab==='intra'?'#FF6C00':'#6B7280')} Même commune
         </button>
-        <button id="pt-home" onclick="setPricingTab('home')" style="flex:1;padding:10px;border-radius:10px;border:none;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.15s;${pricingTab==='home'?'background:#fff;color:#1A1A1A;box-shadow:0 1px 4px rgba(0,0,0,0.1)':'background:transparent;color:#6B7280'}">
-          ${icon('home', 14, pricingTab==='home'?'#FF6C00':'#6B7280')} À domicile
+        <button id="pt-inter" onclick="setPricingTab('inter')" style="flex:1;padding:10px;border-radius:10px;border:none;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.15s;${pricingTab==='inter'?'background:#fff;color:#1A1A1A;box-shadow:0 1px 4px rgba(0,0,0,0.1)':'background:transparent;color:#6B7280'}">
+          ${icon('arrowRight', 14, pricingTab==='inter'?'#FF6C00':'#6B7280')} Autre commune
         </button>
       </div>
     </div>
@@ -2886,7 +3101,7 @@ function renderPricing() {
         <div style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.5px">Prix</div>
       </div>
       ${tarifs.map((t, i) => {
-        const price = pricingTab === 'relay' ? t.relay : t.home;
+        const price = pricingTab === 'intra' ? t.intra : t.inter;
         return `
           <div style="padding:14px 16px;${i < tarifs.length - 1 ? 'border-bottom:1px solid #F6F7F9' : ''}">
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:center">
@@ -2941,7 +3156,7 @@ function renderPricing() {
 
     <!-- CTA -->
     <div style="padding:0 16px 28px">
-      <button class="btn btn-primary btn-full" onclick="Router.navigate('create-shipment')">
+      <button class="btn btn-primary btn-full" onclick="navigateToCreateShipment()">
         ${icon('package', 18)} Envoyer un colis maintenant
       </button>
     </div>
@@ -3149,6 +3364,18 @@ function renderSettings() {
           <div class="list-item-icon" style="background:#FEF2F2">${icon('xCircle', 18, '#DC2626')}</div>
           <div class="list-item-content"><div class="list-item-title" style="color:#DC2626">Supprimer mon compte</div></div>
           ${icon('chevronRight', 16, '#D1D5DB')}
+        </div>
+      </div>
+
+      <div class="section-label">Connexion Réseau</div>
+      <div class="card" style="margin:0 16px 12px">
+        <div class="list-item" onclick="toggleApiEnv()">
+          <div class="list-item-icon" style="background:#FFF3E8">${icon('database', 18, '#FF6C00')}</div>
+          <div class="list-item-content">
+            <div class="list-item-title">Serveur API</div>
+            <div class="list-item-sub" style="font-size:11px;color:#9CA3AF">${API.baseUrl}</div>
+          </div>
+          <span class="badge ${API.envName.includes('Staging') ? 'badge-orange' : 'badge-green'}">${API.envName}</span>
         </div>
       </div>
 
@@ -3439,7 +3666,7 @@ function buildApp() {
     </nav>
 
     <!-- FAB -->
-    <button class="fab-send" id="fab-send" onclick="Router.navigate('create-shipment')" title="Envoyer un colis">
+    <button class="fab-send" id="fab-send" onclick="navigateToCreateShipment()" title="Envoyer un colis">
       <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
     </button>
 
@@ -3458,6 +3685,7 @@ function buildApp() {
 
 function init() {
   State.load();
+  State.loadAllData();
   buildApp();
 
   // Dismiss splash

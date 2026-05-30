@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken';
 import { processScanBypassFromRole } from '../lib/processScanBypass';
 import { SQL_READY_FOR_CARRIER_PICKUP } from '../lib/readyForCarrierPickup';
 import dispatchService from '../services/dispatchService';
+import { computePricing, deriveModeKey, resolvePackageSize, finalPriceForMode, type PackageSize } from '../services/pricingService';
 
 const router = express.Router();
 
@@ -22,34 +23,7 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
     let query = `SELECT s.*, 
                  row_to_json(mmp.*) AS mobile_money_payment,
                  row_to_json(rcp.*) AS relay_cash_payment,
-                 CASE
-                   WHEN s.current_status::text IN ('DELIVERED','DELIVERED_TO_CUSTOMER','PICKED_UP_BY_CUSTOMER','CANCELLED','RETURN_TO_SENDER')
-                     THEN s.current_status::text
-                   WHEN s.payment_method = 'relay_cash' THEN
-                     CASE
-                       WHEN COALESCE(rcp.status::text, '') = 'collected' THEN 'PAYMENT_RECEIVED_AT_RELAY'
-                       ELSE 'PAYMENT_PENDING_AT_RELAY'
-                     END
-                   WHEN s.payment_method = 'mobile_money' AND COALESCE(mmp.status::text, '') = 'rejected'
-                     THEN 'PAYMENT_REJECTED'
-                   WHEN s.payment_method = 'mobile_money'
-                     AND s.payment_status = 'pending'
-                     AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                     THEN 'PAYMENT_AWAITING_VALIDATION'
-                   WHEN s.payment_method = 'mobile_money'
-                     AND s.payment_status = 'paid'
-                     AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                     THEN 'PAYMENT_CONFIRMED_AWAITING_DROP'
-                   WHEN s.payment_method IN ('paystack', 'cinetpay')
-                     AND s.payment_status = 'pending'
-                     AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                     THEN 'PAYMENT_AWAITING_VALIDATION'
-                   WHEN s.payment_method IN ('paystack', 'cinetpay')
-                     AND s.payment_status = 'paid'
-                     AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                     THEN 'PAYMENT_CONFIRMED_AWAITING_DROP'
-                   ELSE COALESCE(s.current_status::text, 'READY_FOR_DROP_OFF')
-                 END AS effective_status,
+                 shipment_effective_status(s.current_status::text, s.payment_method, s.payment_status, COALESCE(mmp.status::text, ''), COALESCE(rcp.status::text, '')) AS effective_status,
                  rp_dest.zone_id as delivery_zone_id,
                  dz.name as delivery_zone_name
                   FROM shipments s
@@ -160,32 +134,7 @@ router.get('/pickup/tracking/:trackingNumber', authenticate, requireRole('transp
     let query = `SELECT s.*, 
                  row_to_json(mmp.*) AS mobile_money_payment,
                  row_to_json(rcp.*) AS relay_cash_payment,
-                 CASE
-                   WHEN s.payment_method = 'relay_cash' THEN
-                     CASE
-                       WHEN COALESCE(rcp.status::text, '') = 'collected' THEN 'PAYMENT_RECEIVED_AT_RELAY'
-                       ELSE 'PAYMENT_PENDING_AT_RELAY'
-                     END
-                   WHEN s.payment_method = 'mobile_money' AND COALESCE(mmp.status::text, '') = 'rejected'
-                     THEN 'PAYMENT_REJECTED'
-                   WHEN s.payment_method = 'mobile_money'
-                     AND s.payment_status = 'pending'
-                     AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                     THEN 'PAYMENT_AWAITING_VALIDATION'
-                   WHEN s.payment_method = 'mobile_money'
-                     AND s.payment_status = 'paid'
-                     AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                     THEN 'PAYMENT_CONFIRMED_AWAITING_DROP'
-                   WHEN s.payment_method IN ('paystack', 'cinetpay')
-                     AND s.payment_status = 'pending'
-                     AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                     THEN 'PAYMENT_AWAITING_VALIDATION'
-                   WHEN s.payment_method IN ('paystack', 'cinetpay')
-                     AND s.payment_status = 'paid'
-                     AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                     THEN 'PAYMENT_CONFIRMED_AWAITING_DROP'
-                   ELSE COALESCE(s.current_status::text, 'READY_FOR_DROP_OFF')
-                 END AS effective_status
+                 shipment_effective_status(s.current_status::text, s.payment_method, s.payment_status, COALESCE(mmp.status::text, ''), COALESCE(rcp.status::text, '')) AS effective_status
                  FROM shipments s
                  LEFT JOIN mobile_money_payments mmp ON mmp.shipment_id = s.id
                  LEFT JOIN relay_cash_payments rcp ON rcp.shipment_id = s.id
@@ -221,32 +170,7 @@ router.get('/pickup/sender-phone/:phone', authenticate, requireRole('transporter
     let query = `SELECT s.*, 
                  row_to_json(mmp.*) AS mobile_money_payment,
                  row_to_json(rcp.*) AS relay_cash_payment,
-                 CASE
-                   WHEN s.payment_method = 'relay_cash' THEN
-                     CASE
-                       WHEN COALESCE(rcp.status::text, '') = 'collected' THEN 'PAYMENT_RECEIVED_AT_RELAY'
-                       ELSE 'PAYMENT_PENDING_AT_RELAY'
-                     END
-                   WHEN s.payment_method = 'mobile_money' AND COALESCE(mmp.status::text, '') = 'rejected'
-                     THEN 'PAYMENT_REJECTED'
-                   WHEN s.payment_method = 'mobile_money'
-                     AND s.payment_status = 'pending'
-                     AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                     THEN 'PAYMENT_AWAITING_VALIDATION'
-                   WHEN s.payment_method = 'mobile_money'
-                     AND s.payment_status = 'paid'
-                     AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                     THEN 'PAYMENT_CONFIRMED_AWAITING_DROP'
-                   WHEN s.payment_method IN ('paystack', 'cinetpay')
-                     AND s.payment_status = 'pending'
-                     AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                     THEN 'PAYMENT_AWAITING_VALIDATION'
-                   WHEN s.payment_method IN ('paystack', 'cinetpay')
-                     AND s.payment_status = 'paid'
-                     AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                     THEN 'PAYMENT_CONFIRMED_AWAITING_DROP'
-                   ELSE COALESCE(s.current_status::text, 'READY_FOR_DROP_OFF')
-                 END AS effective_status
+                 shipment_effective_status(s.current_status::text, s.payment_method, s.payment_status, COALESCE(mmp.status::text, ''), COALESCE(rcp.status::text, '')) AS effective_status
                  FROM shipments s
                  LEFT JOIN mobile_money_payments mmp ON mmp.shipment_id = s.id
                  LEFT JOIN relay_cash_payments rcp ON rcp.shipment_id = s.id
@@ -288,34 +212,7 @@ router.get('/search/phone/:phone', authenticate, async (req: AuthRequest, res) =
     let query = `SELECT s.*,
                  row_to_json(mmp.*) AS mobile_money_payment,
                  row_to_json(rcp.*) AS relay_cash_payment,
-                 CASE
-                   WHEN s.current_status::text IN ('DELIVERED','DELIVERED_TO_CUSTOMER','PICKED_UP_BY_CUSTOMER','CANCELLED','RETURN_TO_SENDER')
-                     THEN s.current_status::text
-                   WHEN s.payment_method = 'relay_cash' THEN
-                     CASE
-                       WHEN COALESCE(rcp.status::text, '') = 'collected' THEN 'PAYMENT_RECEIVED_AT_RELAY'
-                       ELSE 'PAYMENT_PENDING_AT_RELAY'
-                     END
-                   WHEN s.payment_method = 'mobile_money' AND COALESCE(mmp.status::text, '') = 'rejected'
-                     THEN 'PAYMENT_REJECTED'
-                   WHEN s.payment_method = 'mobile_money'
-                     AND s.payment_status = 'pending'
-                     AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                     THEN 'PAYMENT_AWAITING_VALIDATION'
-                   WHEN s.payment_method = 'mobile_money'
-                     AND s.payment_status = 'paid'
-                     AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                     THEN 'PAYMENT_CONFIRMED_AWAITING_DROP'
-                   WHEN s.payment_method IN ('paystack', 'cinetpay')
-                     AND s.payment_status = 'pending'
-                     AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                     THEN 'PAYMENT_AWAITING_VALIDATION'
-                   WHEN s.payment_method IN ('paystack', 'cinetpay')
-                     AND s.payment_status = 'paid'
-                     AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                     THEN 'PAYMENT_CONFIRMED_AWAITING_DROP'
-                   ELSE COALESCE(s.current_status::text, 'READY_FOR_DROP_OFF')
-                 END AS effective_status
+                 shipment_effective_status(s.current_status::text, s.payment_method, s.payment_status, COALESCE(mmp.status::text, ''), COALESCE(rcp.status::text, '')) AS effective_status
                  FROM shipments s
                  LEFT JOIN mobile_money_payments mmp ON mmp.shipment_id = s.id
                  LEFT JOIN relay_cash_payments rcp ON rcp.shipment_id = s.id
@@ -401,34 +298,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
       `SELECT s.*, 
               row_to_json(mmp.*) AS mobile_money_payment,
               row_to_json(rcp.*) AS relay_cash_payment,
-              CASE
-                WHEN s.current_status::text IN ('DELIVERED','DELIVERED_TO_CUSTOMER','PICKED_UP_BY_CUSTOMER','CANCELLED','RETURN_TO_SENDER')
-                  THEN s.current_status::text
-                WHEN s.payment_method = 'relay_cash' THEN
-                  CASE
-                    WHEN COALESCE(rcp.status::text, '') = 'collected' THEN 'PAYMENT_RECEIVED_AT_RELAY'
-                    ELSE 'PAYMENT_PENDING_AT_RELAY'
-                  END
-                WHEN s.payment_method = 'mobile_money' AND COALESCE(mmp.status::text, '') = 'rejected'
-                  THEN 'PAYMENT_REJECTED'
-                WHEN s.payment_method = 'mobile_money'
-                  AND s.payment_status = 'pending'
-                  AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                  THEN 'PAYMENT_AWAITING_VALIDATION'
-                WHEN s.payment_method = 'mobile_money'
-                  AND s.payment_status = 'paid'
-                  AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                  THEN 'PAYMENT_CONFIRMED_AWAITING_DROP'
-                WHEN s.payment_method IN ('paystack', 'cinetpay')
-                  AND s.payment_status = 'pending'
-                  AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                  THEN 'PAYMENT_AWAITING_VALIDATION'
-                WHEN s.payment_method IN ('paystack', 'cinetpay')
-                  AND s.payment_status = 'paid'
-                  AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-                  THEN 'PAYMENT_CONFIRMED_AWAITING_DROP'
-                ELSE COALESCE(s.current_status::text, 'READY_FOR_DROP_OFF')
-              END AS effective_status,
+              shipment_effective_status(s.current_status::text, s.payment_method, s.payment_status, COALESCE(mmp.status::text, ''), COALESCE(rcp.status::text, '')) AS effective_status,
               o.name as origin_name, o.commune as origin_commune, o.quartier as origin_quartier,
               o.address as origin_address, o.phone as origin_phone, o.hours as origin_hours,
               d.name as destination_name, d.commune as destination_commune, d.quartier as destination_quartier,
@@ -522,6 +392,7 @@ router.post('/', async (req: any, res) => {
       origin_relay_id,
       destination_relay_id,
       promo_code,
+      grid_type,
     } = req.body;
 
     // Générer le tracking_number côté serveur si non fourni (évite les collisions frontend)
@@ -559,8 +430,23 @@ router.post('/', async (req: any, res) => {
       shipment_code = code;
     }
 
+    // ─── Recalcul serveur du prix de transport ───────────────────────────────
+    // Le client ne fixe plus le prix : on le recalcule avec la même logique que
+    // GET /pricing-grids/calculate (distance × taille + poids, remise du mode réel
+    // déduit de pickup_method + home_delivery). Fallback sur la valeur client
+    // uniquement si le calcul échoue (zone/tarif indisponible).
+    let serverPrice = parseFloat(price || 0);
+    try {
+      const pkgSize: PackageSize = grid_type === 'courier' ? 'courrier' : resolvePackageSize(package_type);
+      const computed = await computePricing(sender_commune, recipient_commune, pkgSize, parseFloat(weight) || 0);
+      const fp = finalPriceForMode(computed, deriveModeKey(pickup_method, home_delivery));
+      if (fp !== null && Number.isFinite(fp)) serverPrice = fp;
+    } catch (e: any) {
+      console.error('Recalcul prix serveur échoué, fallback prix client:', e.message);
+    }
+
     // Calculate total price: base price + printing fee + assistance fee + box price
-    const totalPrice = parseFloat(price || 0) + parseFloat(printing_fee || 0) + parseFloat(assistance_fee || 0) + parseFloat(box_price || 0);
+    const totalPrice = serverPrice + parseFloat(printing_fee || 0) + parseFloat(assistance_fee || 0) + parseFloat(box_price || 0);
 
     const rawPaymentMethod = (payment_method || '').toString().trim().toLowerCase();
     // paystack/cinetpay sont des providers frontend — on stocke toujours 'mobile_money' en DB
@@ -588,77 +474,85 @@ router.post('/', async (req: any, res) => {
       return;
     }
 
-    const result = await pool.query(
-      `INSERT INTO shipments (
-        tracking_number, sender_first_name, sender_last_name, sender_email, sender_phone,
-        sender_commune, sender_quartier, sender_address, sender_repere,
-        recipient_first_name, recipient_last_name, recipient_email, recipient_phone,
-        recipient_commune, recipient_quartier, recipient_address, recipient_repere,
-        package_type, weight, price, current_status, printing_fee, assistance_fee, box_price,
-        print_at_relay, relay_assisted, home_delivery, pickup_code, shipment_code,
-        payment_status, payment_method, pickup_method,
-        origin_relay_id, destination_relay_id, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35)
-      RETURNING *`,
-      [
-        finalTrackingNumber,
-        sender_first_name, sender_last_name, sender_email || null, sender_phone,
-        sender_commune, sender_quartier, sender_address, sender_repere || null,
-        recipient_first_name, recipient_last_name, recipient_email || null, recipient_phone,
-        recipient_commune, recipient_quartier, recipient_address, recipient_repere || null,
-        package_type, weight, price || 0,
-        derivedStatus,
-        parseFloat(printing_fee || 0), parseFloat(assistance_fee || 0), parseFloat(box_price || 0),
-        print_at_relay || false, relay_assisted || false, home_delivery || false,
-        null,
-        shipment_code,
-        derivedPaymentStatus, normalizedPaymentMethod || null,
-        pickup_method || 'relay_deposit', // INCO-004: stocker le mode de dépôt réel
-        finalOriginRelayId, destination_relay_id || null,
-        userId || null,
-      ]
-    );
+    // Création atomique : le colis et son enregistrement de paiement cash doivent
+    // exister ensemble ou pas du tout. Le trigger trg_count_promo_use (incrément promo)
+    // s'exécute dans la même transaction → annulé aussi en cas de rollback.
+    const client = await pool.connect();
+    let newShipment: any;
+    try {
+      await client.query('BEGIN');
 
-    const newShipment = result.rows[0];
-
-    // Incrémenter uses_count si un code promo valide a été utilisé pour cet envoi gratuit
-    if (promo_code && derivedPaymentStatus === 'paid') {
-      try {
-        await pool.query(
-          `UPDATE promo_codes SET uses_count = uses_count + 1
-           WHERE UPPER(code) = UPPER($1) AND is_active = TRUE
-             AND (max_uses IS NULL OR uses_count < max_uses)`,
-          [promo_code.trim()]
-        );
-      } catch (promoErr: any) {
-        console.error('Failed to increment promo uses_count:', promoErr.message);
-        // Non-bloquant : le colis est déjà créé
-      }
-    }
-
-    if (normalizedPaymentMethod === 'relay_cash') {
-      // collection_location sera défini lors de la confirmation du paiement
-      // Par défaut NULL, sera mis à 'relay' ou 'transporter' selon qui confirme
-      await pool.query(
-        `INSERT INTO relay_cash_payments (shipment_id, relay_point_id, amount_expected, collection_location)
-         VALUES ($1, $2, $3, NULL)
-         ON CONFLICT (shipment_id) DO NOTHING`,
+      const result = await client.query(
+        `INSERT INTO shipments (
+          tracking_number, sender_first_name, sender_last_name, sender_email, sender_phone,
+          sender_commune, sender_quartier, sender_address, sender_repere,
+          recipient_first_name, recipient_last_name, recipient_email, recipient_phone,
+          recipient_commune, recipient_quartier, recipient_address, recipient_repere,
+          package_type, weight, price, current_status, printing_fee, assistance_fee, box_price,
+          print_at_relay, relay_assisted, home_delivery, pickup_code, shipment_code,
+          payment_status, payment_method, pickup_method,
+          origin_relay_id, destination_relay_id, created_by, promo_code
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36)
+        RETURNING *`,
         [
-          newShipment.id,
-          newShipment.origin_relay_id || newShipment.destination_relay_id || null,
-          totalPrice,
+          finalTrackingNumber,
+          sender_first_name, sender_last_name, sender_email || null, sender_phone,
+          sender_commune, sender_quartier, sender_address, sender_repere || null,
+          recipient_first_name, recipient_last_name, recipient_email || null, recipient_phone,
+          recipient_commune, recipient_quartier, recipient_address, recipient_repere || null,
+          package_type, weight, serverPrice,
+          derivedStatus,
+          parseFloat(printing_fee || 0), parseFloat(assistance_fee || 0), parseFloat(box_price || 0),
+          print_at_relay || false, relay_assisted || false, home_delivery || false,
+          null,
+          shipment_code,
+          derivedPaymentStatus, normalizedPaymentMethod || null,
+          pickup_method || 'relay_deposit', // INCO-004: stocker le mode de dépôt réel
+          finalOriginRelayId, destination_relay_id || null,
+          userId || null,
+          promo_code ? promo_code.trim() : null,
         ]
       );
+
+      newShipment = result.rows[0];
+
+      if (normalizedPaymentMethod === 'relay_cash') {
+        // collection_location sera défini lors de la confirmation du paiement
+        // Par défaut NULL, sera mis à 'relay' ou 'transporter' selon qui confirme
+        await client.query(
+          `INSERT INTO relay_cash_payments (shipment_id, relay_point_id, amount_expected, collection_location)
+           VALUES ($1, $2, $3, NULL)
+           ON CONFLICT (shipment_id) DO NOTHING`,
+          [
+            newShipment.id,
+            newShipment.origin_relay_id || newShipment.destination_relay_id || null,
+            totalPrice,
+          ]
+        );
+      }
+
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw txErr;
+    } finally {
+      client.release();
     }
 
+    // Effets secondaires best-effort, APRÈS commit : leur échec ne doit pas invalider
+    // un colis déjà créé (l'agrégat de métriques se resynchronise par ailleurs).
     if (newShipment.origin_relay_id) {
-      await pool.query(
-        `SELECT refresh_relay_daily_metrics(
-            $1,
-            (SELECT (created_at AT TIME ZONE 'Africa/Abidjan')::date FROM shipments WHERE id = $2)
-          )`,
-        [newShipment.origin_relay_id, newShipment.id]
-      );
+      try {
+        await pool.query(
+          `SELECT refresh_relay_daily_metrics(
+              $1,
+              (SELECT (created_at AT TIME ZONE 'Africa/Abidjan')::date FROM shipments WHERE id = $2)
+            )`,
+          [newShipment.origin_relay_id, newShipment.id]
+        );
+      } catch (metricsErr: any) {
+        console.error('refresh_relay_daily_metrics failed (non-bloquant):', metricsErr.message);
+      }
     }
 
     // Auto-assign to best transporter if origin_relay_id exists OR if home_pickup (ramassage à domicile)
@@ -890,22 +784,19 @@ router.post('/:trackingNumber/reject', authenticate, requireRole('transporter', 
     }
     
     const shipment = shipmentResult.rows[0];
-    
-    // Update status to CANCELLED
-    await pool.query(
-      'UPDATE shipments SET current_status = $1, updated_at = NOW(), updated_by = $2 WHERE id = $3',
-      ['CANCELLED', req.user!.id, shipment.id]
+
+    // Transition via la machine à états (source de vérité) : enregistre aussi tracking_events.
+    const scannerType = req.user!.role === 'relay_partner' ? 'relay' : req.user!.role === 'transporter' ? 'transporter' : 'hub';
+    const scanResult = await pool.query(
+      `SELECT process_shipment_scan($1, 'CANCELLED'::shipment_status, NULL, $2::text, $3, NOW(), $4, true) AS r`,
+      [trackingNumber, req.user!.id, scannerType, reason ? `Rejeté: ${reason}` : 'Colis rejeté']
     );
-    
-    // Log the rejection reason if provided
-    if (reason) {
-      const scannerType = req.user!.role === 'relay_partner' ? 'relay' : 'transporter';
-      await pool.query(
-        'INSERT INTO tracking_events (shipment_id, tracking_number, status, notes, scanner_id, scanner_type, timestamp) VALUES ($1, $2, $3, $4, $5, $6, NOW())',
-        [shipment.id, trackingNumber, 'CANCELLED', `Rejeté: ${reason}`, req.user!.id, scannerType]
-      );
+    const r = scanResult.rows[0]?.r;
+    if (!r?.success) {
+      return res.status(400).json({ error: r?.error || 'Rejet impossible' });
     }
-    
+    await pool.query('UPDATE shipments SET updated_by = $1 WHERE id = $2', [req.user!.id, shipment.id]);
+
     res.json({ success: true, message: 'Colis rejeté' });
   } catch (error: any) {
     console.error('Reject shipment error:', error);
@@ -1004,16 +895,15 @@ router.post('/:trackingNumber/cancel', authenticate, async (req: AuthRequest, re
       return res.status(400).json({ error: 'Ce colis a déjà été payé et ne peut pas être annulé ici' });
     }
 
-    await pool.query(
-      `UPDATE shipments SET current_status = $1::shipment_status, updated_at = NOW(), updated_by = $2 WHERE id = $3`,
-      ['CANCELLED', userId, shipment.id]
+    const scanResult = await pool.query(
+      `SELECT process_shipment_scan($1, 'CANCELLED'::shipment_status, NULL, $2::text, 'client', NOW(), $3, true) AS r`,
+      [trackingNumber, userId, 'Annulé par le client']
     );
-
-    await pool.query(
-      `INSERT INTO tracking_events (shipment_id, tracking_number, status, notes, scanner_id, scanner_type, timestamp)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-      [shipment.id, trackingNumber, 'CANCELLED', 'Annulé par le client', userId, 'client']
-    );
+    const r = scanResult.rows[0]?.r;
+    if (!r?.success) {
+      return res.status(400).json({ error: r?.error || 'Annulation impossible' });
+    }
+    await pool.query('UPDATE shipments SET updated_by = $1 WHERE id = $2', [userId, shipment.id]);
 
     res.json({ success: true, message: 'Colis annulé avec succès' });
   } catch (error: any) {
@@ -1048,16 +938,15 @@ router.post('/:trackingNumber/relay-return', authenticate, requireRole('relay_pa
       }
     }
 
-    await pool.query(
-      'UPDATE shipments SET current_status = $1, updated_at = NOW(), updated_by = $2 WHERE id = $3',
-      ['RETURN_TO_SENDER', req.user!.id, shipment.id]
+    const scanResult = await pool.query(
+      `SELECT process_shipment_scan($1, 'RETURN_TO_SENDER'::shipment_status, NULL, $2::text, 'relay', NOW(), $3, true) AS r`,
+      [trackingNumber, req.user!.id, 'Retour expéditeur initié par le point relais']
     );
-
-    await pool.query(
-      `INSERT INTO tracking_events (shipment_id, tracking_number, status, notes, scanner_id, scanner_type, timestamp)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-      [shipment.id, trackingNumber, 'RETURN_TO_SENDER', 'Retour expéditeur initié par le point relais', req.user!.id, 'relay']
-    );
+    const r = scanResult.rows[0]?.r;
+    if (!r?.success) {
+      return res.status(400).json({ error: r?.error || 'Retour impossible' });
+    }
+    await pool.query('UPDATE shipments SET updated_by = $1 WHERE id = $2', [req.user!.id, shipment.id]);
 
     res.json({ success: true, message: 'Retour expéditeur initié avec succès.' });
   } catch (error: any) {
@@ -1393,7 +1282,20 @@ router.post('/:trackingNumber/deliver', authenticate, requireRole('transporter',
     if (!scanResult.success) {
       return res.status(400).json({ error: scanResult.error || 'Erreur lors de la livraison' });
     }
-    
+
+    // Crédit du portefeuille livreur à la livraison (parité avec /handoffs/scan).
+    // creditTransporterWallet est idempotent (garde anti-double-crédit), donc sûr même
+    // si un autre chemin a déjà crédité ce colis.
+    let walletTransporterId: string | null = shipment.transporter_id || null;
+    if (req.user!.role === 'transporter') {
+      const tRes = await pool.query('SELECT id FROM transporters WHERE user_id = $1', [req.user!.id]);
+      walletTransporterId = tRes.rows[0]?.id || walletTransporterId;
+    }
+    if (walletTransporterId) {
+      dispatchService.creditTransporterWallet(shipment.id, walletTransporterId)
+        .catch((err: any) => console.error('Wallet credit error (deliver):', err.message));
+    }
+
     // Update pickup code verification
     await pool.query(
       `UPDATE shipments

@@ -926,33 +926,9 @@ class ApiClient {
     });
   }
 
-  // Pricing Grids Management
-  async getPricingGrids() {
-    return this.request<any[]>('/pricing-grids');
-  }
-
+  // Pricing Grids (lecture seule — la tarification active passe par delivery_price_tiers)
   async getActivePricingGrids() {
     return this.request<any[]>('/pricing-grids/active');
-  }
-
-  async createPricingGrid(gridData: any) {
-    return this.request<any>('/pricing-grids', {
-      method: 'POST',
-      body: JSON.stringify(gridData),
-    });
-  }
-
-  async updatePricingGrid(id: string, gridData: any) {
-    return this.request<any>(`/pricing-grids/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(gridData),
-    });
-  }
-
-  async deletePricingGrid(id: string) {
-    return this.request(`/pricing-grids/${id}`, {
-      method: 'DELETE',
-    });
   }
 
   // Additional Options Management

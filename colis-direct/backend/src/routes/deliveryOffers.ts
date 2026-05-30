@@ -111,32 +111,24 @@ router.post('/:offerId/accept', authenticate, requireRole('transporter'), async 
         [offer.shipment_id, offerId]
       );
 
-      // Assigner le livreur au colis
+      // Assigner le livreur au colis SANS changer le statut logistique.
+      // Le colis n'est pas encore collecté physiquement : il reste READY_FOR_DROP_OFF /
+      // PICKUP_PENDING / RELAY_ORIGIN_RECEIVED jusqu'à la collecte réelle, qui passera
+      // CARRIER_COLLECTED via process_shipment_scan (avec vérification du paiement).
       await client.query(
         `UPDATE shipments
-         SET transporter_id = $1, current_status = 'CARRIER_COLLECTED', updated_at = NOW()
+         SET transporter_id = $1, updated_at = NOW()
          WHERE id = $2`,
         [transporterId, offer.shipment_id]
       );
 
-      // Créer l'entrée d'assignation
+      // Créer l'entrée d'assignation (en attente de collecte)
       await client.query(
         `INSERT INTO transporter_assignments (transporter_id, shipment_id, assignment_status, expected_pickup_at)
          VALUES ($1, $2, 'pending', NOW() + INTERVAL '2 hours')
          ON CONFLICT (transporter_id, shipment_id) DO UPDATE
            SET assignment_status = 'pending', expected_pickup_at = NOW() + INTERVAL '2 hours'`,
         [transporterId, offer.shipment_id]
-      );
-
-      // Événement de tracking
-      const shipmentRes = await client.query(
-        'SELECT tracking_number FROM shipments WHERE id = $1',
-        [offer.shipment_id]
-      );
-      await client.query(
-        `INSERT INTO tracking_events (shipment_id, tracking_number, status, scanner_id, scanner_type, notes)
-         VALUES ($1, $2, 'CARRIER_COLLECTED', $3, 'transporter', 'Livreur indépendant a accepté la course')`,
-        [offer.shipment_id, shipmentRes.rows[0]?.tracking_number, req.user!.id]
       );
 
       await client.query('COMMIT');

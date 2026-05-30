@@ -65,47 +65,49 @@ const allowedOrigins = [
   'http://127.0.0.1:3000',
 ];
 
-const corsOptions = {
-  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) {
-      return callback(null, true);
-    }
-    
-    // Check if origin is allowed
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['Content-Type', 'Authorization'],
-  optionsSuccessStatus: 200, // some legacy browsers (IE11, various SmartTVs) choke on 204
-};
+// ─── CORS ─────────────────────────────────────────────────────────────────
+// L'auth est 100% JWT Bearer (header Authorization), AUCUN cookie → credentials
+// CORS inutile et désactivé (ce qui ferme tout risque d'origine reflétée + credentials).
+// On autorise : origines web de confiance (allowedOrigins) + clients mobiles WebView
+// (Origin 'null' pour file://, localhost, capacitor://, ionic://). En non-prod
+// uniquement : localhost:<port> arbitraire pour le dev.
+// IMPORTANT (CLAUDE.md) : jamais de match de sous-chaîne laxiste sur le domaine
+// (injection de sous-domaine) — comparaison exacte contre allowedOrigins uniquement.
+const isMobileWebViewOrigin = (origin?: string | null): boolean =>
+  !origin ||
+  origin === 'null' ||
+  origin === 'http://localhost' ||
+  origin === 'https://localhost' ||
+  origin === 'capacitor://localhost' ||
+  origin === 'ionic://localhost';
+
+const isDevLocalhostOrigin = (origin?: string | null): boolean =>
+  process.env.NODE_ENV !== 'production' &&
+  !!origin &&
+  /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+
+const isOriginAllowed = (origin?: string | null): boolean =>
+  isMobileWebViewOrigin(origin) ||
+  (!!origin && allowedOrigins.includes(origin)) ||
+  isDevLocalhostOrigin(origin);
+
+app.use(cors((req, callback) => {
+  const origin = req.header('Origin');
+  callback(null, {
+    origin: isOriginAllowed(origin) ? (origin || true) : false,
+    credentials: false, // tout est Bearer token → aucun cookie à transmettre
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['Content-Type', 'Authorization'],
+    optionsSuccessStatus: 200,
+  });
+}));
 
 // Trust first proxy (Traefik) so express-rate-limit can read X-Forwarded-For correctly
 app.set('trust proxy', 1);
 
-// CORS middleware - must be first to handle preflight requests
-app.use(cors(corsOptions));
-
-// Explicitly handle preflight OPTIONS requests for all routes
-app.options('*', (req, res) => {
-  const origin = req.headers.origin;
-  if (origin && (allowedOrigins.includes(origin) || origin.includes('colisdirect.com') || origin.startsWith('http://localhost'))) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With');
-    res.header('Access-Control-Max-Age', '86400');
-    res.sendStatus(200);
-  } else {
-    res.sendStatus(403);
-  }
-});
+// Les requêtes preflight OPTIONS sont gérées par le middleware cors() ci-dessus
+// (optionsSuccessStatus: 200). Pas de handler manuel — une seule source de vérité.
 
 // Mount Paystack webhook RAW body BEFORE JSON parser (needs raw body for HMAC signature verification)
 app.use('/api/payments/paystack/webhook', paymentsWebhookRouter);

@@ -121,15 +121,14 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       {/* ══════════════════════════════════════════════════════
           HERO
       ══════════════════════════════════════════════════════ */}
-      <section style={{ position: 'relative', padding: '0 40px' }}>
+      <section className="px-4 sm:px-8 lg:px-10" style={{ position: 'relative' }}>
         <div
+          className="my-6 min-h-[420px] sm:min-h-[500px] lg:min-h-[560px]"
           style={{
-            margin: '24px 0',
             borderRadius: 24,
             overflow: 'hidden',
             background: '#fff',
             position: 'relative',
-            minHeight: 560,
           }}
         >
           {/* Background truck image */}
@@ -152,27 +151,21 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
           {/* Content grid: text+buttons | spacer | calc card */}
           <div
-            style={{
-              position: 'relative', zIndex: 2,
-              display: 'grid',
-              gridTemplateColumns: '1.2fr 1fr 380px',
-              gap: 32,
-              alignItems: 'center',
-              padding: '60px 56px',
-            }}
+            className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr_380px] gap-6 lg:gap-8 items-center p-6 sm:p-10 lg:px-14 lg:py-16"
+            style={{ position: 'relative', zIndex: 2 }}
           >
             {/* Left — headline + buttons */}
             <div>
               <h1
                 style={{
-                  fontSize: 54, fontWeight: 800, lineHeight: 1.05,
+                  fontSize: 'clamp(30px, 6vw, 54px)', fontWeight: 800, lineHeight: 1.05,
                   margin: 0, letterSpacing: -1, color: '#1A1A1A',
                 }}
               >
                 Envoyez et recevez vos colis{' '}
                 <span style={{ color: '#FF6C00' }}>en toute sécurité</span>
               </h1>
-              <div style={{ display: 'flex', gap: 12, marginTop: 28 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 28 }}>
                 <button
                   onClick={() => onNavigate('create-shipment')}
                   className="btn-primary"
@@ -191,8 +184,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               </div>
             </div>
 
-            {/* Middle spacer — truck breathes here */}
-            <div />
+            {/* Middle spacer — truck breathes here (desktop only) */}
+            <div className="hidden lg:block" />
 
             {/* Right — Calc card */}
             <div
@@ -296,16 +289,13 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       {/* ══════════════════════════════════════════════════════
           TRUST STRIP
       ══════════════════════════════════════════════════════ */}
-      <section style={{ padding: '0 40px' }}>
+      <section className="px-4 sm:px-8 lg:px-10">
         <div
+          className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 p-5 sm:p-6"
           style={{
             background: '#fff',
             border: '1px solid #E6E6E6',
             borderRadius: 18,
-            padding: '24px 28px',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: 24,
             marginTop: -10,
           }}
         >
@@ -335,14 +325,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       {/* ══════════════════════════════════════════════════════
           POURQUOI + COMMENT ÇA MARCHE + PARTNER CTA
       ══════════════════════════════════════════════════════ */}
-      <section
-        style={{
-          padding: '60px 40px',
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 28,
-        }}
-      >
+      <section className="px-4 sm:px-8 lg:px-10 py-10 lg:py-14 grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-7">
         {/* Left — Pourquoi + Comment ça marche */}
         <div
           style={{
@@ -357,7 +340,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </h2>
 
           {/* Stats grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginTop: 28 }}>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-7">
             <StatBadge icon={MapPin}  number="+500"    label="Points relais" />
             <StatBadge icon={Users}   number="+1000"   label="Livreurs agréés" />
             <StatBadge icon={Box}     number="+50 000" label="Colis livrés" />
@@ -369,14 +352,15 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             Comment ça marche ?
           </h3>
           <div style={{ position: 'relative' }}>
-            {/* Dashed orange line */}
+            {/* Dashed orange line (desktop only) */}
             <div
+              className="hidden lg:block"
               style={{
                 position: 'absolute', top: 22, left: 28, right: 28, height: 2,
                 background: 'repeating-linear-gradient(to right, #FF6C00 0 6px, transparent 6px 12px)',
               }}
             />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', position: 'relative' }}>
+            <div className="grid grid-cols-3 lg:grid-cols-6 gap-y-5" style={{ position: 'relative' }}>
               {[
                 { num: 1, icon: Clipboard,   label: 'Créez votre envoi', isLast: false },
                 { num: 2, icon: Calendar,    label: 'Choisissez le type', isLast: false },
@@ -393,15 +377,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
         {/* Right — Partner CTA dark card */}
         <div
+          className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr] gap-5 items-center p-6 sm:p-8"
           style={{
             background: '#0f0f0f',
             color: '#fff',
             borderRadius: 22,
-            padding: 32,
-            display: 'grid',
-            gridTemplateColumns: '1.1fr 1fr',
-            gap: 20,
-            alignItems: 'center',
           }}
         >
           <div>
@@ -414,7 +394,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.72)', marginTop: 14, lineHeight: 1.55 }}>
               Devenez livreur agréé ou point relais et développez votre activité avec COLISDIRECT.
             </p>
-            <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 22 }}>
               <button
                 onClick={() => onNavigate('become-transporter')}
                 style={{
@@ -452,8 +432,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       {/* ══════════════════════════════════════════════════════
           MODES DE LIVRAISON
       ══════════════════════════════════════════════════════ */}
-      <section style={{ padding: '20px 40px 0', maxWidth: 1200, margin: '0 auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <section className="px-4 sm:px-8 lg:px-10 pt-5" style={{ maxWidth: 1200, margin: '0 auto' }}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6">
           {/* Home delivery */}
           <div
             style={{
@@ -555,8 +535,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       {/* ══════════════════════════════════════════════════════
           TARIFS + SUIVI RAPIDE
       ══════════════════════════════════════════════════════ */}
-      <section style={{ padding: '64px 40px 24px', textAlign: 'center' }}>
-        <h2 style={{ fontSize: 40, fontWeight: 800, margin: 0, letterSpacing: -1, color: '#1A1A1A' }}>
+      <section className="px-4 sm:px-8 lg:px-10 pt-12 sm:pt-16 pb-6" style={{ textAlign: 'center' }}>
+        <h2 style={{ fontSize: 'clamp(26px, 5vw, 40px)', fontWeight: 800, margin: 0, letterSpacing: -1, color: '#1A1A1A' }}>
           Des tarifs simples et accessibles
         </h2>
         <div style={{ fontSize: 26, fontWeight: 800, marginTop: 14, color: '#1A1A1A' }}>

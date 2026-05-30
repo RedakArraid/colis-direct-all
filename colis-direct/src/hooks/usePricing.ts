@@ -142,6 +142,22 @@ export function usePricing() {
       if (home_delivery) {
         basePrice += getFixedOption('home_delivery_supplement');
       }
+      // Supplément au poids (cohérent avec le backend /calculate) : au-delà du
+      // poids inclus de la taille, +X FCFA/kg. Lu depuis additional_pricing_options.
+      const readOpt = (key: string, def: number): number => {
+        const o = options.find((x) => x.option_key === key && x.is_active);
+        return o ? parseFloat(o.price_value.toString()) : def;
+      };
+      const includedWeight = resolvedGridType === 'courier'
+        ? readOpt('weight_included_courrier', 1)
+        : readOpt(
+            `weight_included_${package_type}`,
+            package_type === 'petit' ? 5 : package_type === 'moyen' ? 15 : 30
+          );
+      const surchargePerKg = readOpt('weight_surcharge_per_kg', 0);
+      if (weight > includedWeight && surchargePerKg > 0) {
+        basePrice += Math.round((weight - includedWeight) * surchargePerKg);
+      }
     }
 
     // Options additionnelles (fragile, assurance)

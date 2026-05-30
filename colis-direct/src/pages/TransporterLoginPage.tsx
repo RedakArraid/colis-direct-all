@@ -207,6 +207,7 @@ interface TransporterPackage {
   current_status?: string | null;
   payment_status?: string;
   payment_method?: string;
+  pickup_method?: 'relay_deposit' | 'home_pickup';
   price?: number;
   relay_cash_amount_expected?: number;
   assignment_status: string;
@@ -633,8 +634,9 @@ function TransporterLoginPage({ onNavigate }: TransporterLoginPageProps) {
                                   shipmentStatus === 'PAYMENT_PENDING_AT_RELAY' ||
                                   shipmentStatus === 'PAYMENT_RECEIVED_AT_RELAY';
 
-        // Colis avec ramassage à domicile : origin_relay_id null suffit (indépendant de home_delivery)
-        const isHomePickup = !pkg.origin_relay_id && !!pkg.sender_address;
+        // Ramassage à domicile : se baser sur pickup_method (fiable) et non sur origin_relay_id,
+        // qui est null pour TOUS les colis tant qu'aucun relais n'a réceptionné (y compris relay_deposit).
+        const isHomePickup = pkg.pickup_method === 'home_pickup' && !!pkg.sender_address;
         const isReadyForHomePickup = isHomePickup && isReadyForPickup;
 
         // Ajouter si en transit (CARRIER_COLLECTED ou IN_TRANSIT) OU si prêt pour ramassage (pour les colis avec ramassage à domicile)
@@ -732,9 +734,9 @@ function TransporterLoginPage({ onNavigate }: TransporterLoginPageProps) {
                                  shipmentStatus === 'CARRIER_COLLECTED';
 
       // 0. Ramassage à domicile (où récupérer des colis chez l'expéditeur)
-      // Colis avec origin_relay_id = null (ramassage à domicile, peu importe home_delivery)
-      // Uniquement si le colis est prêt pour ramassage
-      const isHomePickup = !pkg.origin_relay_id && pkg.sender_address;
+      // Se baser sur pickup_method (fiable) : origin_relay_id est null pour tous les
+      // colis non encore réceptionnés, y compris les dépôts relais.
+      const isHomePickup = pkg.pickup_method === 'home_pickup' && pkg.sender_address;
       if (isHomePickup && isReadyForPickup) {
         // Utiliser l'adresse complète comme clé pour regrouper les colis au même domicile d'expédition
         const addressKey = `${pkg.sender_address}_${pkg.sender_commune}`;

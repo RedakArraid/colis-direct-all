@@ -39,7 +39,6 @@ import UsersManagement from './admin/UsersManagement';
 import RelayPointsManagement from './admin/RelayPointsManagement';
 import ShipmentsManagement from './admin/ShipmentsManagement';
 import TransportersManagement from './admin/TransportersManagement';
-import PricingManagement from './admin/PricingManagement';
 import DeliveryPricingManagement from './admin/DeliveryPricingManagement';
 import RelayApplicationsManagement from './admin/RelayApplicationsManagement';
 import DeliveryZonesManagement from './admin/DeliveryZonesManagement';
@@ -62,7 +61,6 @@ type Section =
   | 'shipments'
   | 'transporters'
   | 'delivery-zones'
-  | 'pricing'
   | 'delivery-pricing'
   | 'promo-codes'
   | 'support-messages'
@@ -289,8 +287,7 @@ function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       { id: 'shipments', label: 'Envois', icon: Package },
       { id: 'transporters', label: 'Transporteurs', icon: Truck },
       { id: 'delivery-zones', label: 'Zones de livraison', icon: MapPin },
-      { id: 'pricing', label: 'Tarifs (grilles)', icon: DollarSign },
-      { id: 'delivery-pricing', label: 'Tarifs distance', icon: Route },
+      { id: 'delivery-pricing', label: 'Tarifs', icon: Route },
       { id: 'promo-codes', label: 'Codes promo', icon: Tag },
       { id: 'support-messages', label: 'Messagerie support', icon: MessageSquare, badge: escalatedTickets > 0 ? escalatedTickets : undefined },
       { id: 'marketplace-finance', label: 'Finance Marketplace', icon: TrendingUp },
@@ -842,8 +839,6 @@ function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         return <TransportersManagement />;
       case 'delivery-zones':
         return <DeliveryZonesManagement />;
-      case 'pricing':
-        return <PricingManagement />;
       case 'delivery-pricing':
         return <DeliveryPricingManagement />;
       case 'promo-codes':

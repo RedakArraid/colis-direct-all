@@ -350,34 +350,7 @@ router.get('/:id/active-shipments', authenticate, async (req: AuthRequest, res) 
       SELECT s.*,
         row_to_json(mmp.*) AS mobile_money_payment,
         row_to_json(rcp.*) AS relay_cash_payment,
-        CASE
-          WHEN s.current_status::text IN ('DELIVERED','DELIVERED_TO_CUSTOMER','PICKED_UP_BY_CUSTOMER','CANCELLED','RETURN_TO_SENDER')
-            THEN s.current_status::text
-          WHEN s.payment_method = 'relay_cash' THEN
-            CASE
-              WHEN COALESCE(rcp.status::text, '') = 'collected' THEN 'PAYMENT_RECEIVED_AT_RELAY'
-              ELSE 'PAYMENT_PENDING_AT_RELAY'
-            END
-          WHEN s.payment_method = 'mobile_money' AND COALESCE(mmp.status::text, '') = 'rejected'
-            THEN 'PAYMENT_REJECTED'
-          WHEN s.payment_method = 'mobile_money'
-            AND s.payment_status = 'pending'
-            AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-            THEN 'PAYMENT_AWAITING_VALIDATION'
-          WHEN s.payment_method = 'mobile_money'
-            AND s.payment_status = 'paid'
-            AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-            THEN 'PAYMENT_CONFIRMED_AWAITING_DROP'
-          WHEN s.payment_method IN ('paystack', 'cinetpay')
-            AND s.payment_status = 'pending'
-            AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-            THEN 'PAYMENT_AWAITING_VALIDATION'
-          WHEN s.payment_method IN ('paystack', 'cinetpay')
-            AND s.payment_status = 'paid'
-            AND (s.current_status IS NULL OR s.current_status = 'READY_FOR_DROP_OFF'::shipment_status)
-            THEN 'PAYMENT_CONFIRMED_AWAITING_DROP'
-          ELSE COALESCE(s.current_status::text, 'READY_FOR_DROP_OFF')
-        END AS effective_status,
+        shipment_effective_status(s.current_status::text, s.payment_method, s.payment_status, COALESCE(mmp.status::text, ''), COALESCE(rcp.status::text, '')) AS effective_status,
         rp_dest.zone_id AS delivery_zone_id,
         dz.name AS delivery_zone_name
       FROM shipments s

@@ -41,8 +41,8 @@ export default function Footer({ onNavigate }: FooterProps) {
   );
 
   return (
-    <footer style={{ background: '#0f0f0f', color: '#fff', padding: '40px 40px 24px' }}>
-      <div className="grid gap-8" style={{ gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr' }}>
+    <footer className="px-4 sm:px-8 lg:px-10 pt-10 pb-6" style={{ background: '#0f0f0f', color: '#fff' }}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr] gap-8">
         {/* Brand */}
         <div>
           <Logo size="sm" showText className="text-white mb-4" />
@@ -96,7 +96,7 @@ export default function Footer({ onNavigate }: FooterProps) {
 
       {/* Bottom bar */}
       <div
-        className="flex justify-between items-center"
+        className="flex flex-col sm:flex-row justify-between items-center gap-2 text-center"
         style={{
           marginTop: 32,
           paddingTop: 20,

@@ -73,23 +73,6 @@ services:
       - traefik.http.routers.colisdirect-api-staging.tls.certresolver=mytlschallenge
       - traefik.http.routers.colisdirect-api-staging.service=colisdirect-api-staging
       - traefik.http.services.colisdirect-api-staging.loadbalancer.server.port=3001
-      # CORS Headers - Configuration pour toutes les requêtes
-      - traefik.http.middlewares.colisdirect-cors-headers-staging.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,OPTIONS,PATCH
-      - traefik.http.middlewares.colisdirect-cors-headers-staging.headers.accesscontrolallowheaders=Content-Type,Authorization,X-Requested-With
-      - traefik.http.middlewares.colisdirect-cors-headers-staging.headers.accesscontrolalloworiginlist=https://staging.colisdirect.com
-      - traefik.http.middlewares.colisdirect-cors-headers-staging.headers.accesscontrolallowcredentials=true
-      - traefik.http.middlewares.colisdirect-cors-headers-staging.headers.accesscontrolmaxage=86400
-      - traefik.http.middlewares.colisdirect-cors-headers-staging.headers.addvaryheader=true
-      # Router principal avec CORS - toutes les méthodes sauf OPTIONS
-      - traefik.http.routers.colisdirect-api-staging.middlewares=colisdirect-cors-headers-staging
-      # Router spécifique pour OPTIONS (preflight) avec priorité plus élevée
-      - traefik.http.routers.colisdirect-api-staging-options.rule=Host(`staging-api.colisdirect.com`) && Method(`OPTIONS`)
-      - traefik.http.routers.colisdirect-api-staging-options.entrypoints=websecure
-      - traefik.http.routers.colisdirect-api-staging-options.tls=true
-      - traefik.http.routers.colisdirect-api-staging-options.tls.certresolver=mytlschallenge
-      - traefik.http.routers.colisdirect-api-staging-options.service=colisdirect-api-staging
-      - traefik.http.routers.colisdirect-api-staging-options.middlewares=colisdirect-cors-headers-staging
-      - traefik.http.routers.colisdirect-api-staging-options.priority=10
 
   # ===========================================================================
   # Colis Direct Frontend Staging
