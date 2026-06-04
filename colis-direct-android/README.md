@@ -10,13 +10,28 @@ colis-direct-android/android/   ← projet Gradle (ouvrir dans Android Studio)
 
 ## Build & run
 
+Depuis la racine du monorepo (`colisdirect-all`) :
+
 ```bash
 cd colis-direct-android/android
-cp local.properties.example local.properties   # adapter sdk.dir si besoin
+cp local.properties.example local.properties
+./scripts/build-dev.sh
+```
+
+Si ton terminal est **déjà** dans `.../colis-direct-android/android`, ne refais pas `cd colis-direct-android/android` (chemin invalide). Lance seulement :
+
+```bash
+./scripts/build-dev.sh
+```
+
+Le script configure `JAVA_HOME` via Android Studio (évite l’erreur « Unable to locate a Java Runtime »). Sans lui :
+
+```bash
+export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 ./gradlew :app:assembleDevDebug
 ```
 
-APK dev : `android/app/build/outputs/apk/dev/debug/app-dev-debug.apk`
+APK dev : `app/build/outputs/apk/dev/debug/app-dev-debug.apk`
 
 API dev par défaut : staging (`BuildConfig` flavor `dev`). Surcharge locale : `dev.api.base.url` dans `local.properties`.
 

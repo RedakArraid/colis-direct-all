@@ -6,6 +6,17 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:mobile": "VITE_API_URL=https://staging-api.colisdirect.com/api vite build",
+    "build:mobile:staging": "VITE_API_URL=https://staging-api.colisdirect.com/api vite build",
+    "build:mobile:android-local": "VITE_API_URL=http://10.0.2.2:3001/api vite build",
+    "build:mobile:ios-local": "VITE_API_URL=http://localhost:3001/api vite build",
+    "cap:sync": "npm run build:mobile && cap sync ios",
+    "cap:sync:staging": "npm run build:mobile:staging && cap sync ios",
+    "cap:sync:ios-local": "npm run build:mobile:ios-local && cap sync ios",
+    "cap:open:ios": "cap open ios",
+    "cap:run:ios": "npm run build:mobile && cap run ios",
+    "android:build": "cd ../colis-direct-android/android && ./scripts/build-dev.sh",
+    "android:open": "open -a 'Android Studio' ../colis-direct-android/android",
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
@@ -19,6 +30,8 @@
     "tw:build": "tailwindcss -i src/index.css -o src/tailwind-output.css"
   },
   "dependencies": {
+    "@capacitor/browser": "^7.0.5",
+    "@capacitor/core": "^7.6.5",
     "@zxing/browser": "^0.1.5",
     "@zxing/library": "^0.21.3",
     "leaflet": "^1.9.4",
@@ -32,6 +45,9 @@
     "recharts": "^3.3.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^7.6.5",
+    "@capacitor/cli": "^7.6.5",
+    "@capacitor/ios": "^7.6.5",
     "@eslint/js": "^9.9.1",
     "@playwright/test": "^1.59.1",
     "@types/leaflet": "^1.9.21",
