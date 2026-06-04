@@ -2,20 +2,20 @@
 
 ## Android (application native — recommandé)
 
-Projet Gradle : `colis-direct-android/android/` (Kotlin + Compose).
+Projet Gradle : `colis-direct/android/` (Kotlin + Compose).
 
 ```bash
-cd colis-direct-android/android
-./gradlew :app:installDevDebug
+cd colis-direct/android
+./scripts/build-dev.sh
 ```
 
-Ou ouvrir `colis-direct-android/android` dans Android Studio, flavor **dev**, variante **debug**.
+Ou ouvrir `colis-direct/android` dans Android Studio, flavor **dev**, variante **debug**.
 
-Voir `colis-direct-android/README.md` et `colis-direct-android/android/MOBILE_UI.md`.
+Voir `colis-direct/android/README.md` et `colis-direct/android/MOBILE_UI.md`.
 
 API locale (émulateur) : `dev.api.base.url=http://10.0.2.2:3001/api/` dans `local.properties`.
 
-> L’ancien dossier Capacitor `colis-direct/android/` a été retiré ; ne plus utiliser `npm run cap:open:android`.
+> Android = projet **natif** dans `colis-direct/android/` (plus de shell Capacitor WebView).
 
 ## iOS
 

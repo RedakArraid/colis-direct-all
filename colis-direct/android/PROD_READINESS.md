@@ -11,7 +11,7 @@
 ## Builds
 
 ```bash
-cd colis-direct-android/android
+cd colis-direct/android
 
 # Dev (staging API)
 ./scripts/build-dev.sh

@@ -2,7 +2,7 @@
 # Vérifie les prérequis MCP Android (mobile-mcp) pour ColisDirect
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 SDK="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 
 echo "=== ColisDirect — setup MCP Android ==="

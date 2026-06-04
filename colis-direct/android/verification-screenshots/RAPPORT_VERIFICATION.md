@@ -59,7 +59,7 @@ Compte : `e2e+client@colisdirect.test` (API staging par défaut sur flavor dev).
 ## Relancer
 
 ```bash
-cd colis-direct-android/android
+cd colis-direct/android
 ./scripts/verify-screenshots.sh emulator-5554
 bash scripts/verify-screenshots-connected.sh emulator-5554
 ```

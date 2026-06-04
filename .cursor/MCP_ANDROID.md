@@ -14,8 +14,8 @@ Fichier : [`.cursor/mcp.json`](mcp.json) (racine du monorepo).
 
 ```bash
 # Installateur MCP global + cache mobile-mcp + vérif adb
-chmod +x colis-direct-android/scripts/install-mcp.sh
-./colis-direct-android/scripts/install-mcp.sh
+chmod +x colis-direct/scripts/android-mcp/install-mcp.sh
+./colis-direct/scripts/android-mcp/install-mcp.sh
 ```
 
 Installe :
@@ -49,11 +49,11 @@ adb devices
 emulator -list-avds
 
 # Flavor dev : API staging par défaut (comptes e2e+*@colisdirect.test).
-# Backend local optionnel : dev.api.base.url=http://10.0.2.2:3001/api/ dans colis-direct-android/android/local.properties
+# Backend local optionnel : dev.api.base.url=http://10.0.2.2:3001/api/ dans colis-direct/android/local.properties
 #   puis : cd colis-direct && docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 # Build APK natif
-cd colis-direct-android/android
+cd colis-direct/android
 ./scripts/build-dev.sh
 ```
 
@@ -61,14 +61,14 @@ cd colis-direct-android/android
 
 - « Liste les appareils Android connectés »
 - « Lance l’émulateur Pixel_API_34 et attends qu’il soit prêt »
-- « Installe l’APK dev ColisDirect : `colis-direct-android/android/app/build/outputs/apk/dev/debug/app-dev-debug.apk` »
+- « Installe l’APK dev ColisDirect : `colis-direct/android/app/build/outputs/apk/dev/debug/app-dev-debug.apk` »
 - « Ouvre l’app `ci.colisdirect.app` et prends une capture de l’écran d’accueil »
 - « Compare visuellement avec les screenshots Capacitor dans le doc capacitor_screenshots »
 
 ## Package ColisDirect
 
 - **ID application :** `ci.colisdirect.app`
-- **APK dev :** `colis-direct-android/android/app/build/outputs/apk/dev/debug/app-dev-debug.apk`
+- **APK dev :** `colis-direct/android/app/build/outputs/apk/dev/debug/app-dev-debug.apk`
 
 ## Dépannage
 

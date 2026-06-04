@@ -2,7 +2,7 @@
 
 L’affichage suit **`colis-direct/www/app.js`** (app Capacitor dans l’APK), **pas** le site React `colis-direct/src/`.
 
-**Maquette produit (zip)** : voir [`MAQUETTE_ANDROID.md`](MAQUETTE_ANDROID.md) — écarts UI/parcours vs implémentation actuelle (app client 7 écrans, paiement 4, livreur 8). Sources JSX : [`docs/maquette-reference/`](../docs/maquette-reference/).
+**Maquette produit (zip)** : voir [`MAQUETTE_ANDROID.md`](MAQUETTE_ANDROID.md) — écarts UI/parcours vs implémentation actuelle (app client 7 écrans, paiement 4, livreur 8). Sources JSX : [`docs/android-maquette/maquette-reference/`](../docs/android-maquette/maquette-reference/).
 
 ## MCP Android (Cursor)
 
@@ -10,12 +10,12 @@ Config MCP à la racine du monorepo : **`colis-direct-all/.cursor/mcp.json`** (s
 
 ```bash
 # Installer mcp-installer + mobile-mcp (1ère fois)
-chmod +x colis-direct-android/scripts/install-mcp.sh
-./colis-direct-android/scripts/install-mcp.sh
+chmod +x colis-direct/scripts/android-mcp/install-mcp.sh
+./colis-direct/scripts/android-mcp/install-mcp.sh
 
 # Vérifier adb + config
-chmod +x colis-direct-android/scripts/setup-mcp.sh
-./colis-direct-android/scripts/setup-mcp.sh
+chmod +x colis-direct/scripts/android-mcp/setup-mcp.sh
+./colis-direct/scripts/android-mcp/setup-mcp.sh
 ```
 
 Puis **redémarrer Cursor** → Réglages → **MCP** → `mobile-mcp` activé.
@@ -25,7 +25,7 @@ Guide complet : [`../../.cursor/MCP_ANDROID.md`](../../.cursor/MCP_ANDROID.md)
 ## Build
 
 ```bash
-cd colis-direct-android/android
+cd colis-direct/android
 chmod +x scripts/build-dev.sh
 ./scripts/build-dev.sh
 ```

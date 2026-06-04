@@ -154,4 +154,4 @@ Contrainte produit : **aucun scan caméra** pour relais et transporteur — sais
 
 ---
 
-*Dernière analyse : juin 2026 — zip `colisdirect.zip` + état repo `colis-direct-android/android`.*
+*Dernière analyse : juin 2026 — zip `colisdirect.zip` + état repo `colis-direct/android`.*

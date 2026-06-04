@@ -2,7 +2,7 @@
 # Installe l'outil MCP Installer + pré-télécharge mobile-mcp pour ColisDirect
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 SDK="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 MCP_INSTALLER_PKG="@mcp-installer/cli"
 MOBILE_MCP_PKG="@mobilenext/mobile-mcp@latest"
