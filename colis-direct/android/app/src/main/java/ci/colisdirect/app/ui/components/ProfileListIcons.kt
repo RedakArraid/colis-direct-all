@@ -13,7 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 
-// Pastilles — www/app.js .list-item-icon
+// Pastilles profil — style maquette
 val ProfileIconBlueBg = Color(0xFFEEF4FF)
 val ProfileIconBlue = Color(0xFF2F6BE0)
 val ProfileIconGreenBg = Color(0xFFE6F6EC)

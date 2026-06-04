@@ -49,7 +49,7 @@ Voir aussi `local.properties.example`.
 - [ ] QA complète flavor **staging** puis **prod** sur API réelle
 - [ ] `./gradlew assembleProdRelease` + test install APK signé
 - [ ] Vérifier Paystack / callbacks en prod
-- [ ] Confirmer que l’app **native** est bien celle publiée (vs Capacitor historique)
+- [ ] Publier le flavor **prod** (`ci.colisdirect.app`), pas l’APK dev
 - [ ] Pas de boutons « Connexion rapide » en release prod (`DevE2EAccounts` = DEBUG + ENV dev uniquement)
 
 ## Écarts connus (non bloquants store si acceptés produit)

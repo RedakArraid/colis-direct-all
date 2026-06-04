@@ -8,7 +8,6 @@
     "build": "vite build",
     "build:mobile": "VITE_API_URL=https://staging-api.colisdirect.com/api vite build",
     "build:mobile:staging": "VITE_API_URL=https://staging-api.colisdirect.com/api vite build",
-    "build:mobile:android-local": "VITE_API_URL=http://10.0.2.2:3001/api vite build",
     "build:mobile:ios-local": "VITE_API_URL=http://localhost:3001/api vite build",
     "cap:sync": "npm run build:mobile && cap sync ios",
     "cap:sync:staging": "npm run build:mobile:staging && cap sync ios",
@@ -16,6 +15,8 @@
     "cap:open:ios": "cap open ios",
     "cap:run:ios": "npm run build:mobile && cap run ios",
     "android:build": "cd android && ./scripts/build-dev.sh",
+    "android:install": "cd android && adb install -r app/build/outputs/apk/dev/debug/app-dev-debug.apk && adb shell am start -n ci.colisdirect.app.dev/ci.colisdirect.app.MainActivity",
+    "android:clean-emulator": "adb uninstall ci.colisdirect.app 2>/dev/null; adb uninstall ci.colisdirect.app.staging 2>/dev/null; true",
     "android:open": "open -a 'Android Studio' android",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -45,7 +46,6 @@
     "recharts": "^3.3.0"
   },
   "devDependencies": {
-    "@capacitor/android": "^7.6.5",
     "@capacitor/cli": "^7.6.5",
     "@capacitor/ios": "^7.6.5",
     "@eslint/js": "^9.9.1",

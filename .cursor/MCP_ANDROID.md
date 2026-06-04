@@ -62,12 +62,12 @@ cd colis-direct/android
 - « Liste les appareils Android connectés »
 - « Lance l’émulateur Pixel_API_34 et attends qu’il soit prêt »
 - « Installe l’APK dev ColisDirect : `colis-direct/android/app/build/outputs/apk/dev/debug/app-dev-debug.apk` »
-- « Ouvre l’app `ci.colisdirect.app` et prends une capture de l’écran d’accueil »
-- « Compare visuellement avec les screenshots Capacitor dans le doc capacitor_screenshots »
+- « Ouvre l’app `ci.colisdirect.app.dev` (ColisDirect DEV) et prends une capture de l’écran d’accueil »
+- « Compare avec les captures dans `colis-direct/android/verification-screenshots/` »
 
 ## Package ColisDirect
 
-- **ID application :** `ci.colisdirect.app`
+- **ID application (flavor dev) :** `ci.colisdirect.app.dev` — ne pas confondre avec l’ancienne app Capacitor `ci.colisdirect.app` (1.0)
 - **APK dev :** `colis-direct/android/app/build/outputs/apk/dev/debug/app-dev-debug.apk`
 
 ## Dépannage

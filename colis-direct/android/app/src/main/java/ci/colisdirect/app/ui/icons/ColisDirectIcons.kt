@@ -16,7 +16,7 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.ui.graphics.vector.ImageVector
 
 /**
- * Icônes stroke alignées sur [colis-direct/www/app.js] (Lucide / bottom-nav + profil).
+ * Icônes stroke alignées maquette / web (Lucide).
  */
 object ColisDirectIcons {
     val Home: ImageVector = Icons.Outlined.Home

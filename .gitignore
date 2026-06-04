@@ -79,6 +79,10 @@ out/
 .env.staging
 .env.production
 
+# Ancien emplacement / shell mobile legacy
+colis-direct-android/
+colis-direct/www/
+
 # MCP Android — clones optionnels locaux
 colis-direct/tools/
 

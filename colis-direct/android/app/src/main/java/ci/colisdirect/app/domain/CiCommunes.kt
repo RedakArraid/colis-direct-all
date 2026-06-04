@@ -1,6 +1,6 @@
 package ci.colisdirect.app.domain
 
-/** Communes CI — aligné `colis-direct/www/app.js` (CI_COMMUNES) */
+/** Communes CI — aligné web / maquette */
 object CiCommunes {
     val all: List<String> = listOf(
         "Abengourou", "Abobo", "Aboisso", "Adiaké", "Adjamé", "Adzopé", "Agboville", "Agnibilékrou",

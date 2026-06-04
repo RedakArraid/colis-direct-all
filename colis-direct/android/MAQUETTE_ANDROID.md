@@ -38,7 +38,7 @@ Il n’y a **pas** de section dédiée **point relais** (guichet, réception, re
 | Points relais | Relais (+ onglet **Suivre** en plus) |
 | Profil | Profil |
 
-La maquette regroupe création / suivi sous **Envois** ; le natif suit plutôt **`www/app.js`** (Capacitor) avec onglet Suivre séparé.
+La maquette regroupe création / suivi sous **Envois** ; le natif a un onglet **Suivre** séparé.
 
 ### Écran par écran
 
@@ -154,4 +154,4 @@ Contrainte produit : **aucun scan caméra** pour relais et transporteur — sais
 
 ---
 
-*Dernière analyse : juin 2026 — zip `colisdirect.zip` + état repo `colis-direct/android`.*
+*Dernière analyse : juin 2026 — zip `colisdirect.zip` + `colis-direct/android/` (natif).*

@@ -27,7 +27,7 @@ object PricingHelper {
         return pricing?.modes?.find { it.key == key && it.available != false }?.finalPriceFcfa
     }
 
-    /** Fallback local — aligné www/app.js calculatePrice() */
+    /** Fallback local — aligné grille tarifaire web */
     fun estimateLocalPrice(
         senderCommune: String,
         recipientCommune: String,

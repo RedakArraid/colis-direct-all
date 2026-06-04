@@ -2,18 +2,20 @@
 
 | Dossier | Rôle |
 |---------|------|
-| **[colis-direct/](colis-direct/)** | Web React + API backend + **Android natif** |
-| → `colis-direct/android/` | App **Kotlin / Compose** |
-| **[colis-direct-ios/](colis-direct-ios/)** | iOS |
+| **[colis-direct/](colis-direct/)** | Web React + API + **Android natif** (`colis-direct/android/`) |
+| **[colis-direct-ios/](colis-direct-ios/)** | iOS (placeholder) |
 
-## Android
+## Android (natif uniquement)
 
 ```bash
-cd colis-direct/android
-./scripts/build-dev.sh
+cd colis-direct
+npm run android:build
+npm run android:install
 ```
 
-Ou : `cd colis-direct && npm run android:build`
+Package émulateur : **`ci.colisdirect.app.dev`** (ColisDirect DEV).
+
+Supprimé / obsolète : shell Capacitor `www/`, `@capacitor/android`, package `ci.colisdirect.app` (1.0).
 
 ## Docs
 
