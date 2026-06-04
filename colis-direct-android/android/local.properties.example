@@ -1,0 +1,17 @@
+# Copier vers local.properties (fichier gitignoré) et adapter.
+# Gradle lit ce fichier pour le SDK et l’URL API du flavor dev.
+
+sdk.dir=/chemin/vers/Android/sdk
+
+# ── Flavor dev (APK ci.colisdirect.app.dev) ─────────────────────────────────
+# Par défaut si absent : https://staging-api.colisdirect.com/api/
+# (même API / BDD que les comptes E2E e2e+*@colisdirect.test)
+
+# Staging explicite (optionnel, identique au défaut) :
+# dev.api.base.url=https://staging-api.colisdirect.com/api/
+
+# Backend local sur la machine hôte — émulateur Android :
+# dev.api.base.url=http://10.0.2.2:3001/api/
+
+# Backend local — téléphone physique (remplacer par l’IP du Mac sur le LAN) :
+# dev.api.base.url=http://192.168.1.10:3001/api/

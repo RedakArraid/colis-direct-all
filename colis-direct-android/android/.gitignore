@@ -1,0 +1,25 @@
+# Gradle
+.gradle/
+build/
+
+# Configuration locale (clés, SDK path)
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+.kotlin/
+
+# Builds
+*.apk
+*.aab
+
+# NDK / natif
+.externalNativeBuild/
+.cxx/
+/captures/
+
+# Captures UI à la racine (voir verification-screenshots/)
+screenshot*.png
+
+.DS_Store

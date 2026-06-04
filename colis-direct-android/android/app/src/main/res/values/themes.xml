@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ColisDirect" parent="Theme.SplashScreen">
+        <item name="android:windowSplashScreenBackground">#F97316</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.ColisDirect.NoActionBar</item>
+    </style>
+
+    <style name="Theme.ColisDirect.NoActionBar" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+</resources>

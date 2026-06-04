@@ -78,3 +78,17 @@ out/
 .env.production.local
 .env.staging
 .env.production
+
+# MCP Android — clones optionnels locaux
+colis-direct-android/tools/
+
+# Ancien shell Capacitor (remplacé par colis-direct-android/android)
+colis-direct/android/
+
+# App Android native — caches & secrets locaux
+colis-direct-android/android/.gradle/
+colis-direct-android/android/.kotlin/
+colis-direct-android/android/local.properties
+colis-direct-android/android/.idea/
+colis-direct-android/android/**/build/
+colis-direct-android/android/screenshot*.png

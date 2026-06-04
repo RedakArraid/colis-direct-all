@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Default app_name is overridden by build flavors -->
+    <string name="app_name">ColisDirect</string>
+    <string name="title_activity_main">ColisDirect</string>
+
+    <!-- Auth -->
+    <string name="login_title">Connexion</string>
+    <string name="email_hint">Adresse email</string>
+    <string name="phone_hint">Numéro de téléphone</string>
+    <string name="password_hint">Mot de passe</string>
+    <string name="login_button">Se connecter</string>
+    <string name="logout_button">Se déconnecter</string>
+
+    <!-- Shipments -->
+    <string name="tracking_number">Numéro de suivi</string>
+    <string name="shipment_code">Code d\'envoi</string>
+    <string name="create_shipment">Envoyer un colis</string>
+    <string name="my_shipments">Mes colis</string>
+
+    <!-- Scanner -->
+    <string name="scan_hint">Pointez la caméra vers le code du colis</string>
+    <string name="camera_permission_required">Permission caméra requise</string>
+
+    <!-- Generic -->
+    <string name="loading">Chargement…</string>
+    <string name="error_network">Erreur réseau. Vérifiez votre connexion.</string>
+    <string name="retry">Réessayer</string>
+    <string name="cancel">Annuler</string>
+    <string name="confirm">Confirmer</string>
+    <string name="back">Retour</string>
+    <string name="save">Enregistrer</string>
+    <string name="success">Succès</string>
+</resources>
