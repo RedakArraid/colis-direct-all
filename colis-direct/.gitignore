@@ -74,3 +74,20 @@ tests/e2e/.auth/
 *.pid.lock
 
 src/tailwind-output.css
+
+# Android native (Gradle)
+android/.gradle/
+android/.kotlin/
+android/local.properties
+android/.idea/
+android/**/build/
+android/screenshot*.png
+
+# iOS / Xcode user state
+ios-native/**/*.xcuserstate
+ios-native/**/xcuserdata/
+**/*.xcuserstate
+
+# iOS Capacitor (décommenter si vous ne versionnez pas le dossier ios/)
+# ios/App/Pods/
+# ios/App/App/public/

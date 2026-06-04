@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { MapPin, Navigation, Phone, Clock, ExternalLink } from 'lucide-react';
 
 interface RelayPoint {

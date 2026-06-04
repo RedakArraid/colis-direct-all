@@ -555,6 +555,16 @@ router.post('/', async (req: any, res) => {
       }
     }
 
+    // Recherche de livreur (style Uber). Pour un home_pickup payé en ligne (paystack/cinetpay/
+    // mobile_money) NON encore payé, on diffère le dispatch jusqu'à la confirmation du paiement
+    // (voir dispatchHomePickups dans payments.ts) — sinon on chercherait un livreur avant paiement.
+    // Les autres cas (relay_deposit, ou home_pickup en espèces / gratuit promo) : dispatch immédiat.
+    const onlineProviders = ['paystack', 'cinetpay', 'mobile_money'];
+    const awaitingOnlinePayment =
+      onlineProviders.includes(String(newShipment.payment_method || '').toLowerCase()) &&
+      String(newShipment.payment_status || '').toLowerCase() !== 'paid';
+    const deferDispatchToPayment = pickup_method === 'home_pickup' && awaitingOnlinePayment;
+
     // Auto-assign to best transporter if origin_relay_id exists OR if home_pickup (ramassage à domicile)
     // Pour les colis avec home_pickup, on peut aussi assigner automatiquement si une zone de livraison correspond
     if (newShipment.origin_relay_id || pickup_method === 'home_pickup') {
@@ -566,9 +576,11 @@ router.post('/', async (req: any, res) => {
         if (updatedResult.rows.length > 0) {
           // ─── Dispatch Marketplace (non-bloquant) ─────────────────────────
           // Tenter le dispatch marketplace en parallèle (offre aux livreurs indépendants)
-          dispatchService.dispatchShipment(newShipment.id).catch((err: any) =>
-            console.error('Marketplace dispatch error (after assign):', err.message)
-          );
+          if (!deferDispatchToPayment) {
+            dispatchService.dispatchShipment(newShipment.id).catch((err: any) =>
+              console.error('Marketplace dispatch error (after assign):', err.message)
+            );
+          }
           return res.status(201).json(updatedResult.rows[0]);
         }
       } catch (assignError: any) {
@@ -579,9 +591,11 @@ router.post('/', async (req: any, res) => {
     }
 
     // ─── Dispatch Marketplace pour tous les colis (non-bloquant) ─────────────
-    dispatchService.dispatchShipment(newShipment.id).catch((err: any) =>
-      console.error('Marketplace dispatch error:', err.message)
-    );
+    if (!deferDispatchToPayment) {
+      dispatchService.dispatchShipment(newShipment.id).catch((err: any) =>
+        console.error('Marketplace dispatch error:', err.message)
+      );
+    }
 
     res.status(201).json(newShipment);
   } catch (error: any) {

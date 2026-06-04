@@ -12,7 +12,7 @@ chmod +x colis-direct/scripts/android-mcp/install-mcp.sh
 ./colis-direct/scripts/android-mcp/install-mcp.sh
 ```
 
-Guide : [`../../.cursor/MCP_ANDROID.md`](../../.cursor/MCP_ANDROID.md)
+Guide MCP (monorepo `colisdirect-all`) : [`.cursor/MCP_ANDROID.md`](../../.cursor/MCP_ANDROID.md) — ou installer via `scripts/android-mcp/`
 
 ## Build & install
 
@@ -45,9 +45,18 @@ Surcharge locale : `dev.api.base.url` dans `local.properties` — ex. `http://10
 
 **Production** : [`PROD_READINESS.md`](PROD_READINESS.md) · `./scripts/build-prod.sh`
 
-**Transporteur / livreur** : `CourierMainScreen` — même API que `TransporterSpace.tsx` web.
+## Espaces staff (parité web)
 
-## Écrans
+| Rôle | Shell Android | Web |
+|------|---------------|-----|
+| `transporter` | `CourierMainScreen` (Accueil · Courses · Gains · Profil) | `TransporterSpace.tsx` |
+| `relay_partner` | `RelayMainScreen` (Vue · Paiements · Colis · Assistance · Paramètres) | `RelayDashboard.tsx` |
+| `admin` | `AdminMainScreen` | `AdminDashboard.tsx` |
+| `support` | `SupportMainScreen` | `CustomerSupportDashboard.tsx` |
+
+Redirection : splash + connexion Profil (boutons E2E en dev). Un staff **ne doit pas** rester sur l’accueil client.
+
+## Écrans client (MainContainer)
 
 | Onglet | Composable | Équivalent web React |
 |--------|------------|----------------------|

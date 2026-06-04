@@ -158,25 +158,7 @@ type PaymentBreakdownItem = {
   count: number;
 };
 
-interface InvoiceRow {
-  shipment: EnrichedShipment;
-  invoiceNumber: string;
-  customerName: string;
-  amount: number;
-  paymentMethod: string;
-  serviceType: string;
-  createdDate: Date;
-}
 
-interface BordereauRow {
-  shipment: EnrichedShipment;
-  tracking: string;
-  createdDate: Date;
-  deliveryMode: string;
-  packageType: string;
-  amount: number;
-  weight?: number | null;
-}
 
 interface RelaySettingsForm {
   name: string;
@@ -496,12 +478,6 @@ function RelayDashboard({ onNavigate }: RelayDashboardProps) {
     assistance: false,
     settings: false,
   });
-  const [invoiceSearch, setInvoiceSearch] = useState('');
-  const [invoicePeriod, setInvoicePeriod] = useState<'all' | 'today' | 'week' | 'month'>('all');
-  const [invoicePaymentFilter, setInvoicePaymentFilter] = useState<'all' | string>('all');
-  const [slipSearch, setSlipSearch] = useState('');
-  const [slipPeriod, setSlipPeriod] = useState<'all' | 'today' | 'week' | 'month'>('all');
-  const [slipDeliveryFilter, setSlipDeliveryFilter] = useState<'all' | 'relay' | 'home'>('all');
   const [colisSubTab, setColisSubTab] = useState<ColisSubTab>('en_cours');
   const [colisSearch, setColisSearch] = useState('');
   const [showAssistForm, setShowAssistForm] = useState(false);
@@ -1562,53 +1538,11 @@ function RelayDashboard({ onNavigate }: RelayDashboardProps) {
     openHtmlInWindow(html);
   };
 
-  const openInvoice = async (shipment: ShipmentItem, mode: 'preview' | 'print') => {
-    const fullShipment = await loadShipmentDetails(shipment);
-    if (!fullShipment) return;
-    const html = buildInvoiceHtml(fullShipment, { autoPrint: mode === 'print' });
-    openHtmlInWindow(html);
-  };
-
-  const downloadInvoice = async (shipment: ShipmentItem) => {
-    const fullShipment = await loadShipmentDetails(shipment);
-    if (!fullShipment) return;
-    const html = buildInvoiceHtml(fullShipment, { autoPrint: false });
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `facture-${fullShipment.tracking_number}.html`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.info('Fichier HTML téléchargé. La version PDF sera disponible prochainement.');
-  };
-
   const previewLabel = async (shipment: ShipmentItem) => {
     const fullShipment = await loadShipmentDetails(shipment);
     if (!fullShipment) return;
     const html = buildLabelHtml(fullShipment, { autoPrint: false });
     openHtmlInWindow(html);
-  };
-
-  const openLabel = async (shipment: ShipmentItem, mode: 'preview' | 'print') => {
-    const fullShipment = await loadShipmentDetails(shipment);
-    if (!fullShipment) return;
-    const html = buildLabelHtml(fullShipment, { autoPrint: mode === 'print' });
-    openHtmlInWindow(html);
-  };
-
-  const downloadLabel = async (shipment: ShipmentItem) => {
-    const fullShipment = await loadShipmentDetails(shipment);
-    if (!fullShipment) return;
-    const html = buildLabelHtml(fullShipment, { autoPrint: false });
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `bordereau-${fullShipment.tracking_number}.html`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.info('Fichier HTML téléchargé. La version PDF sera disponible prochainement.');
   };
 
   const handleLogout = async () => {
@@ -1735,125 +1669,9 @@ function RelayDashboard({ onNavigate }: RelayDashboardProps) {
 
   const assistedShipments = useMemo(() => enrichedShipments.filter((shipment) => shipment.relay_assisted), [enrichedShipments]);
 
-  const invoiceRows = useMemo<InvoiceRow[]>(() => {
-    const unique = new Map<string, InvoiceRow>();
 
-    enrichedShipments.forEach((shipment) => {
-      const key = `FAC-${shipment.tracking_number}`;
-      const customerName =
-        `${shipment.sender_first_name ?? ''} ${shipment.sender_last_name ?? ''}`.trim() ||
-        `${shipment.recipient_first_name ?? ''} ${shipment.recipient_last_name ?? ''}`.trim() ||
-        'Client';
 
-      const amount = shipment.computedAmount;
 
-      if (unique.has(key)) {
-        const existing = unique.get(key)!;
-        unique.set(key, {
-          ...existing,
-          amount: existing.amount + amount,
-        });
-      } else {
-        unique.set(key, {
-          shipment,
-          invoiceNumber: key,
-          customerName,
-          amount,
-          paymentMethod: shipment.paymentMethodLabel,
-          serviceType: shipment.serviceTypeLabel,
-          createdDate: shipment.createdDate,
-        });
-      }
-    });
-
-    return Array.from(unique.values()).sort((a, b) => b.createdDate.getTime() - a.createdDate.getTime());
-  }, [enrichedShipments]);
-
-  const bordereauRows = useMemo<BordereauRow[]>(() => {
-    return enrichedShipments
-      .map((shipment) => ({
-        shipment,
-        tracking: shipment.tracking_number,
-        createdDate: shipment.createdDate,
-        deliveryMode: shipment.deliveryModeLabel,
-        packageType: shipment.package_type === 'petit' ? 'Petit' : shipment.package_type === 'moyen' ? 'Moyen' : 'Grand',
-        amount: shipment.computedAmount,
-        weight: shipment.weight,
-      }))
-      .sort((a, b) => b.createdDate.getTime() - a.createdDate.getTime());
-  }, [enrichedShipments]);
-
-  const startOfDay = useMemo(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  }, [enrichedShipments]);
-
-  const startOfWeek = useMemo(() => {
-    const dayRef = new Date();
-    dayRef.setHours(0, 0, 0, 0);
-    const day = dayRef.getDay();
-    const diffToMonday = (day + 6) % 7;
-    dayRef.setDate(dayRef.getDate() - diffToMonday);
-    return dayRef;
-  }, [enrichedShipments]);
-
-  const startOfMonth = useMemo(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  }, [enrichedShipments]);
-
-  const matchesPeriod = useCallback((date: Date, period: 'all' | 'today' | 'week' | 'month') => {
-    if (period === 'all') return true;
-    if (period === 'today') return date >= startOfDay;
-    if (period === 'week') return date >= startOfWeek;
-    if (period === 'month') return date >= startOfMonth;
-    return true;
-  }, [startOfDay, startOfWeek, startOfMonth]);
-
-  const filteredInvoices = useMemo(() => {
-    return invoiceRows.filter((row) => {
-      const searchValue = invoiceSearch.trim().toLowerCase();
-      const matchesSearch =
-        searchValue === '' ||
-        row.invoiceNumber.toLowerCase().includes(searchValue) ||
-        row.shipment.tracking_number.toLowerCase().includes(searchValue) ||
-        row.customerName.toLowerCase().includes(searchValue);
-      const matchesPayment = invoicePaymentFilter === 'all' || row.paymentMethod === invoicePaymentFilter;
-      const matchesDate = matchesPeriod(row.createdDate, invoicePeriod);
-      return matchesSearch && matchesPayment && matchesDate;
-    });
-  }, [invoiceRows, invoiceSearch, invoicePaymentFilter, invoicePeriod, matchesPeriod]);
-
-  const invoiceTotalAmount = useMemo(() => {
-    return filteredInvoices.reduce((sum, row) => sum + toNumeric(row.amount), 0);
-  }, [filteredInvoices]);
-
-  const invoicePaymentOptions = useMemo(() => {
-    const unique = new Set<string>();
-    invoiceRows.forEach((row) => {
-      if (row.paymentMethod) unique.add(row.paymentMethod);
-    });
-    return Array.from(unique);
-  }, [invoiceRows]);
-
-  const filteredBordereaux = useMemo(() => {
-    return bordereauRows.filter((row) => {
-      const searchValue = slipSearch.trim().toLowerCase();
-      const matchesSearch =
-        searchValue === '' ||
-        row.tracking.toLowerCase().includes(searchValue) ||
-        row.shipment.recipient_first_name?.toLowerCase().includes(searchValue) ||
-        row.shipment.recipient_last_name?.toLowerCase().includes(searchValue) ||
-        row.shipment.sender_first_name?.toLowerCase().includes(searchValue) ||
-        row.shipment.sender_last_name?.toLowerCase().includes(searchValue);
-      const matchesDelivery =
-        slipDeliveryFilter === 'all' ||
-        (slipDeliveryFilter === 'home' && row.shipment.home_delivery) ||
-        (slipDeliveryFilter === 'relay' && !row.shipment.home_delivery);
-      const matchesDate = matchesPeriod(row.createdDate, slipPeriod);
-      return matchesSearch && matchesDelivery && matchesDate;
-    });
-  }, [bordereauRows, slipSearch, slipDeliveryFilter, slipPeriod, matchesPeriod]);
 
   const colisEnCours = useMemo(() =>
     shipments.filter(s => {
@@ -1926,6 +1744,17 @@ function RelayDashboard({ onNavigate }: RelayDashboardProps) {
   // Dans le contexte du dashboard relais, relay_cash s'applique toujours au dépôt client
   // y compris les colis home_delivery déposés au relais (flux validé depuis Issue 3)
   const isRelayDeposit = true;
+  // Rôle du relais vis-à-vis du colis scanné (doit être défini avant canConfirmPaymentHere)
+  const isAtDestinationRelay = !!(
+    scannedShipment?.destination_relay_id &&
+    user?.relay_point_id &&
+    String(scannedShipment.destination_relay_id) === String(user.relay_point_id)
+  );
+  const isAtOriginRelay = !!(
+    scannedShipment?.origin_relay_id &&
+    user?.relay_point_id &&
+    String(scannedShipment.origin_relay_id) === String(user.relay_point_id)
+  );
   // Ce relais peut encaisser le paiement seulement s'il est le relais d'origine assigné
   // (ou si aucun relais n'est assigné — colis en réseau ouvert, cas rare)
   const canConfirmPaymentHere = !scannedShipment?.origin_relay_id || isAtOriginRelay;
@@ -1945,17 +1774,6 @@ function RelayDashboard({ onNavigate }: RelayDashboardProps) {
       : 'Réceptionner';
   const scanIsDeliverAction = effectiveScannedStatus === 'AVAILABLE_FOR_PICKUP';
 
-  // Rôle du relais connecté vis-à-vis du colis scanné
-  const isAtDestinationRelay = !!(
-    scannedShipment?.destination_relay_id &&
-    user?.relay_point_id &&
-    String(scannedShipment.destination_relay_id) === String(user.relay_point_id)
-  );
-  const isAtOriginRelay = !!(
-    scannedShipment?.origin_relay_id &&
-    user?.relay_point_id &&
-    String(scannedShipment.origin_relay_id) === String(user.relay_point_id)
-  );
 
   // Statuts terminaux — indépendants du rôle
   const SCAN_TERMINAL_STATUSES: Record<string, string> = {
@@ -2514,7 +2332,7 @@ function RelayDashboard({ onNavigate }: RelayDashboardProps) {
                   </div>
                 </div>
                 <button
-                  onClick={() => setActiveTab('scan')}
+                  onClick={() => setExpandedSections(prev => ({ ...prev, scanner: true }))}
                   className="shrink-0 px-4 py-2 bg-[#FF6C00] text-white text-sm font-semibold rounded-lg hover:bg-[#ff8534] transition-colors whitespace-nowrap"
                 >
                   Scanner un colis

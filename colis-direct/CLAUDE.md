@@ -51,7 +51,7 @@ dev  →  staging (tests E2E + validation manuelle)  →  main (prod)
 ```bash
 # Staging — merge + rebuild
 git merge origin/dev --no-edit
-docker compose -f docker-compose.staging.yml up -d --build --no-deps colisdirect-backend-staging colisdirect-frontend-staging
+docker compose -f docker-compose.staging.yml up -d --build --no-deps colisdirect-backend colisdirect-frontend
 
 # Prod — TOUJOURS utiliser --env-file .env.production (sinon ${COLISDIRECT_DB_PASSWORD} prend la valeur par défaut incorrecte)
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --no-deps colisdirect-backend colisdirect-frontend

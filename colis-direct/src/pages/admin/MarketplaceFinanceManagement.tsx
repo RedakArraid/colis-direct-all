@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, Wallet, Clock, Check, X, Loader2, RefreshCw, TrendingUp } from 'lucide-react';
+import { Check, X, Loader2, RefreshCw, TrendingUp } from 'lucide-react';
 import { api } from '../../lib/api';
 import { toast } from 'react-toastify';
 

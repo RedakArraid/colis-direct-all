@@ -106,8 +106,8 @@ function PromoCodesManagement() {
       description: form.description || undefined,
       discount_type: form.discount_type,
       discount_value: parseFloat(form.discount_value) || 0,
-      max_uses: form.max_uses ? parseInt(form.max_uses) : null,
-      expires_at: form.expires_at || null,
+      max_uses: form.max_uses ? parseInt(form.max_uses) : undefined,
+      expires_at: form.expires_at || undefined,
     };
 
     const { error } = editTarget

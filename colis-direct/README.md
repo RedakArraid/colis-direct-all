@@ -2,6 +2,31 @@
 
 Plateforme de livraison de colis à Abidjan via un réseau de points relais locaux.
 
+> Dépôt monorepo parent : [colis-direct-all](https://github.com/RedakArraid/colis-direct-all) (ce projet est aussi poussé sur [colis-direct](https://github.com/RedakArraid/colis-direct)).
+
+## Applications mobiles
+
+| Plateforme | Dossier | Stack |
+|------------|---------|-------|
+| **Android** | [`android/`](android/) | **Kotlin + Jetpack Compose** (natif, flavors dev/staging/prod) |
+| **iOS (web)** | [`ios/`](ios/) | Capacitor 7 → build Vite `dist/` |
+| **iOS (natif)** | [`ios-native/`](ios-native/) | SwiftUI (client, relais, transporteur — partiel) |
+
+```bash
+# Android (recommandé)
+npm run android:build
+npm run android:install
+# Package émulateur : ci.colisdirect.app.dev (ColisDirect DEV)
+
+# iOS Capacitor
+npm run cap:sync:staging
+npm run cap:open:ios
+```
+
+Guides : [android/README.md](android/README.md) · [docs/guides/development/ANDROID_NATIVE.md](docs/guides/development/ANDROID_NATIVE.md) · [docs/guides/development/MOBILE_EMULATORS.md](docs/guides/development/MOBILE_EMULATORS.md)
+
+**Obsolète :** shell Capacitor Android (`www/`, `@capacitor/android`), package `ci.colisdirect.app` 1.0.
+
 ## Démarrage rapide avec Docker
 
 ### Prérequis
@@ -100,26 +125,18 @@ Guide complet : [DEPLOYMENT.md](docs/guides/deployment/DEPLOYMENT.md).
 ## Structure du projet
 
 ```
-├── backend/              # API Express/TypeScript
-│   ├── src/
-│   │   ├── routes/      # Routes API
-│   │   ├── middleware/  # Authentification JWT
-│   │   └── db/          # Connexion PostgreSQL
-│   └── Dockerfile
+├── android/             # App Android native (Kotlin / Compose)
+├── ios/                 # Shell Capacitor iOS (web dist)
+├── ios-native/          # App iOS SwiftUI (partielle)
+├── backend/             # API Express/TypeScript
 ├── src/                 # Frontend React/TypeScript
-│   ├── components/
-│   ├── pages/
-│   ├── contexts/
-│   ├── lib/             # Client API (api.ts)
-│   └── Dockerfile
-├── database/
-│   ├── init/            # Scripts SQL au premier démarrage
-│   └── migrations/      # Migrations SQL versionnées
+├── database/            # Migrations PostgreSQL
 ├── docs/                # Documentation
-├── docker-compose.yml           # Base commune
-├── docker-compose.dev.yml       # Overrides développement local
-├── docker-compose.staging.yml   # Staging (VPS)
-└── docker-compose.prod.yml      # Production (VPS)
+├── scripts/android-mcp/ # Install MCP mobile pour Cursor
+├── docker-compose.yml
+├── docker-compose.dev.yml
+├── docker-compose.staging.yml
+└── docker-compose.prod.yml
 ```
 
 ## Base de données
@@ -185,6 +202,8 @@ Géré automatiquement par Traefik avec Let's Encrypt (résolveur `mytlschalleng
 ## Technologies
 
 - **Frontend** : React 18, TypeScript, Tailwind CSS, Vite
+- **Android** : Kotlin 2, Jetpack Compose, Hilt, Retrofit
+- **iOS** : Capacitor 7 et/ou SwiftUI (`ios-native/`)
 - **Backend** : Node.js, Express, TypeScript
 - **Base de données** : PostgreSQL 15
 - **Authentification** : JWT

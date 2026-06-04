@@ -500,6 +500,20 @@ function TransporterLoginPage({ onNavigate }: TransporterLoginPageProps) {
     return () => clearInterval(id);
   }, [user]);
 
+  // Suivi GPS temps réel : pousse la position au backend tant que le livreur est connecté
+  // (visible côté expéditeur sur la carte « livreur en route », style Uber).
+  useEffect(() => {
+    if (!user || user.role !== 'transporter' || !navigator.geolocation) return;
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        api.updateMyLocation(pos.coords.latitude, pos.coords.longitude).catch(() => { /* best-effort */ });
+      },
+      () => { /* permission refusée / indisponible : on ignore */ },
+      { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [user]);
+
 
 
   // Mise à jour automatique de la liste des colis livrés toutes les 10 secondes
@@ -872,69 +886,6 @@ function TransporterLoginPage({ onNavigate }: TransporterLoginPageProps) {
   }, [packages, scannedPackages, deliveredShipments]);
 
   // Fonction pour récupérer les numéros de suivi des colis à ramasser pour un arrêt donné
-  const getPickupTrackingNumbers = useMemo(() => {
-    const deliveredTrackingNumbersSet = new Set<string>();
-    scannedPackages.forEach((scannedPkg, trackingNumber) => {
-      if (scannedPkg.isDelivered) {
-        deliveredTrackingNumbersSet.add(trackingNumber);
-      }
-    });
-    deliveredShipments.forEach((deliveredPkg) => {
-      deliveredTrackingNumbersSet.add(deliveredPkg.tracking_number);
-    });
-
-    return (stop: TourStop): string[] => {
-      const results: string[] = [];
-
-      packages.forEach((pkg) => {
-        // Exclure les colis déjà livrés
-        if (deliveredTrackingNumbersSet.has(pkg.tracking_number)) {
-        return;
-      }
-
-        const shipmentStatus = normalizeShipmentStatus(pkg.current_status);
-        const isDelivered = isShipmentDelivered(shipmentStatus) || 
-                           shipmentStatus === 'RELAY_FINAL_RECEIVED' || 
-                           shipmentStatus === 'AVAILABLE_FOR_PICKUP' ||
-                           shipmentStatus === 'DELIVERED' ||
-                           shipmentStatus === 'DELIVERED_TO_CUSTOMER' ||
-                           shipmentStatus === 'PICKED_UP_BY_CUSTOMER';
-        
-        if (isDelivered) {
-          return;
-        }
-
-        // Vérifier si ce colis correspond à cet arrêt
-        if (stop.type === 'home_pickup') {
-          const isReadyForHomePickup = shipmentStatus === 'PICKUP_PENDING' ||
-                                       shipmentStatus === 'READY_FOR_DROP_OFF' ||
-                                       shipmentStatus === 'PAYMENT_CONFIRMED_AWAITING_DROP' ||
-                                       shipmentStatus === 'PAYMENT_PENDING_AT_RELAY' ||
-                                       shipmentStatus === 'PAYMENT_RECEIVED_AT_RELAY';
-          const isHomePickup = !pkg.origin_relay_id && pkg.sender_address;
-          if (isHomePickup && isReadyForHomePickup &&
-              pkg.sender_address === stop.address && pkg.sender_commune === stop.commune) {
-            // Pour le domicile : afficher le shipment_code (code court à 6 chiffres)
-            // pour que le transporteur identifie rapidement le colis chez l'expéditeur
-            results.push(pkg.shipment_code || pkg.tracking_number);
-          }
-        } else if (stop.type === 'relay_pickup') {
-          const isConfirmedAtRelay = shipmentStatus === 'RELAY_ORIGIN_RECEIVED' ||
-                                     shipmentStatus === 'PAYMENT_PENDING_AT_RELAY' ||
-                                     shipmentStatus === 'PAYMENT_RECEIVED_AT_RELAY';
-          if (!isConfirmedAtRelay) return;
-          const relayId = pkg.origin_relay_id;
-          const relayName = pkg.relay_name || `Point relais ${relayId?.slice(0, 8) || 'inconnu'}`;
-          if ((stop.relayId && relayId === stop.relayId) || (!stop.relayId && relayName === stop.name)) {
-            results.push(pkg.shipment_code || pkg.tracking_number);
-          }
-        }
-      });
-
-      return results;
-    };
-  }, [packages, scannedPackages, deliveredShipments]);
-
   const getStopPackages = useMemo(() => {
     return (stop: TourStop): TransporterPackage[] => {
       return packages.filter((pkg) => {
@@ -1797,53 +1748,6 @@ function TransporterLoginPage({ onNavigate }: TransporterLoginPageProps) {
       setHomePickupConfirmModal({ pkg: { ...pkg, payment_status: 'paid' }, shipmentCode: pkg.shipment_code || pkg.tracking_number });
       await loadTransporterData();
     }
-  };
-
-  const handleRelayDelivery = async (trackingNumber: string) => {
-    try {
-      const pkg = packages.find(p => p.tracking_number === trackingNumber);
-      if (!pkg || !pkg.destination_relay_id) {
-        setFeedback({ type: 'error', message: 'ID du point relais de destination manquant.' });
-        return;
-      }
-      
-      const { error } = await api.scanHandoff(trackingNumber, pkg.destination_relay_id);
-      if (error) {
-        setFeedback({ type: 'error', message: `Erreur lors du dépôt: ${error}` });
-        return;
-      }
-
-      setScannedPackages(prev => {
-        const newMap = new Map(prev);
-        const scanned = newMap.get(trackingNumber);
-        if (scanned) {
-          newMap.set(trackingNumber, { ...scanned, isDelivered: true });
-        }
-        saveScannedPackages(newMap);
-        return newMap;
-      });
-      setFeedback({ type: 'success', message: 'Colis déposé au point relais avec succès !' });
-      
-      // Recharger les données pour mettre à jour les listes
-      await loadTransporterData();
-      // Recharger immédiatement la liste des colis livrés pour que le colis apparaisse dans "Colis livrés"
-      await loadDeliveredShipments();
-    } catch (error: any) {
-      console.error('Relay delivery error:', error);
-      setFeedback({ type: 'error', message: `Erreur: ${error.message || 'Erreur inconnue'}` });
-    }
-  };
-
-  const handleCall = (trackingNumber: string) => {
-    setScannedPackages(prev => {
-      const newMap = new Map(prev);
-      const scanned = newMap.get(trackingNumber);
-      if (scanned) {
-        newMap.set(trackingNumber, { ...scanned, isCalled: true });
-      }
-      saveScannedPackages(newMap);
-      return newMap;
-    });
   };
 
   const handlePickupCodeModalValidation = async () => {

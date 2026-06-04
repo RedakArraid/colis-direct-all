@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { api, type Shipment } from '../lib/api';
 import ShipmentDetailsModal from '../components/shipment/ShipmentDetailsModal';
 import LoadingSpinner from '../components/LoadingSpinner';
+import PaystackInlinePayment from '../components/shipment/PaystackInlinePayment';
 import {
   isShipmentDelivered,
   normalizePaymentStatus,
@@ -41,6 +42,13 @@ function MyShipmentsPage({}: MyShipmentsPageProps = {}) {
   const [waybillTrackingNumber, setWaybillTrackingNumber] = useState<string>('');
   const [pendingActionLoading, setPendingActionLoading] = useState<string | null>(null);
   const [retryPaymentMethod, setRetryPaymentMethod] = useState<Record<string, 'online' | 'relay_cash'>>({});
+  const [activePaymentShipment, setActivePaymentShipment] = useState<{
+    trackingNumber: string;
+    amountFcfa: number;
+    customerName: string;
+    customerEmail: string;
+    customerPhone: string;
+  } | null>(null);
 
   useEffect(() => {
     loadShipments();
@@ -315,13 +323,6 @@ function MyShipmentsPage({}: MyShipmentsPageProps = {}) {
         toast.error('Montant invalide pour ce colis. Contactez le support.');
         return;
       }
-      const payload = {
-        tracking_number: shipment.tracking_number,
-        amount_fcfa,
-        customer_name: `${user.first_name} ${user.last_name}`.trim() || `${shipment.sender_first_name} ${shipment.sender_last_name}`,
-        customer_email: user.email || shipment.sender_email || '',
-        customer_phone: user.phone || shipment.sender_phone || '',
-      };
       const method = retryPaymentMethod[shipment.tracking_number] || 'online';
       if (method === 'relay_cash') {
         const { error } = await api.switchToRelayPayment(shipment.tracking_number);
@@ -330,10 +331,14 @@ function MyShipmentsPage({}: MyShipmentsPageProps = {}) {
         loadShipments();
         return;
       }
-      const { data, error } = await api.initMobileMoneyPayment(payload);
-      if (error || !data) { toast.error(error || 'Erreur lors de l\'initialisation du paiement'); return; }
-      window.open(data.payment_url, '_blank');
-      toast.info('Vous allez être redirigé vers la page de paiement. Revenez ici une fois le paiement effectué.');
+      
+      setActivePaymentShipment({
+        trackingNumber: shipment.tracking_number,
+        amountFcfa: amount_fcfa,
+        customerName: `${user.first_name} ${user.last_name}`.trim() || `${shipment.sender_first_name} ${shipment.sender_last_name}` || 'Client',
+        customerEmail: user.email || shipment.sender_email || 'paiement@colisdirect.com',
+        customerPhone: user.phone || shipment.sender_phone || '',
+      });
     } finally {
       setPendingActionLoading(null);
     }
@@ -882,6 +887,24 @@ function MyShipmentsPage({}: MyShipmentsPageProps = {}) {
               <iframe title="waybill" className="w-full h-full min-h-[600px]" srcDoc={waybillHtml}></iframe>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Modal de paiement en ligne (Paystack Inline) */}
+      {activePaymentShipment && (
+        <div className="fixed inset-0 z-[100] overflow-y-auto">
+          <PaystackInlinePayment
+            trackingNumber={activePaymentShipment.trackingNumber}
+            amountFcfa={activePaymentShipment.amountFcfa}
+            customerName={activePaymentShipment.customerName}
+            customerEmail={activePaymentShipment.customerEmail}
+            customerPhone={activePaymentShipment.customerPhone}
+            onBack={() => setActivePaymentShipment(null)}
+            onSuccess={() => {
+              setActivePaymentShipment(null);
+              loadShipments();
+            }}
+          />
         </div>
       )}
     </div>

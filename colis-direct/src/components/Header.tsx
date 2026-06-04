@@ -35,7 +35,7 @@ const NAV_ITEMS: { id: PageType; label: string }[] = [
 
 export default function Header({ currentPage, onNavigate }: HeaderProps) {
   const { user, signOut } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { setTheme } = useTheme();
   const { activeSpace, setActiveSpace } = useUserSpace();
   useCart();
 

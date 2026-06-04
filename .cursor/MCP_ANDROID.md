@@ -70,6 +70,14 @@ cd colis-direct/android
 - **ID application (flavor dev) :** `ci.colisdirect.app.dev` — ne pas confondre avec l’ancienne app Capacitor `ci.colisdirect.app` (1.0)
 - **APK dev :** `colis-direct/android/app/build/outputs/apk/dev/debug/app-dev-debug.apk`
 
+## Tester les rôles (MCP / manuel)
+
+1. `npm run android:install` depuis `colis-direct/`
+2. Profil → **Connexion rapide (dev)** → Admin / Point relais / Transporteur (`admin123`)
+3. Vérifier les shells : dashboard admin, relais Cocody, livreur (toggle En ligne)
+
+Si l’accueil client affiche « Reconnectez-vous… » pour un staff : réinstaller l’APK dev récent ou se déconnecter puis reconnecter via E2E.
+
 ## Dépannage
 
 | Problème | Action |

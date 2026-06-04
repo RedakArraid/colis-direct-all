@@ -1,41 +1,25 @@
-const CACHE_NAME = 'colis-direct-v1';
-const STATIC_ASSETS = ['/', '/index.html', '/manifest.json'];
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  );
+// Kill-switch service worker.
+//
+// L'ancien SW (cache du shell applicatif) laissait des navigateurs bloqués sur
+// des builds périmés — au point de servir une version assez ancienne pour
+// utiliser un autre SDK de paiement Paystack, d'où des échecs de transaction.
+//
+// Ce SW ne met plus rien en cache : à l'activation il vide tous les caches, se
+// désinscrit, puis force le rechargement des fenêtres ouvertes. Le rechargement
+// se fait alors sans SW → le build courant est chargé depuis le réseau.
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
-});
-
-self.addEventListener('fetch', (event) => {
-  if (event.request.url.includes('/api/')) return;
-
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match('/index.html'))
-    );
-    return;
-  }
-
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        if (response.ok) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        }
-        return response;
-      })
-      .catch(() => caches.match(event.request))
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+      await self.clients.claim();
+      await self.registration.unregister();
+      const clients = await self.clients.matchAll({ type: 'window' });
+      clients.forEach((client) => client.navigate(client.url));
+    })()
   );
 });

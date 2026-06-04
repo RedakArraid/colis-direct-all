@@ -51,6 +51,7 @@ fun MainContainerScreen(
     onDeliveryConfirm: () -> Unit,
     onPickupScan: () -> Unit,
     onHomePickup: () -> Unit,
+    onStaffLogin: (String) -> Unit = {},
     initialTrackingPrefill: String? = null,
     onTrackingPrefillConsumed: () -> Unit = {},
     authViewModel: AuthViewModel = hiltViewModel(),
@@ -75,6 +76,13 @@ fun MainContainerScreen(
 
     LaunchedEffect(authState.user?.id) {
         if (isLoggedIn) currentTab = TabType.HOME
+    }
+
+    // Staff connecté ne doit pas rester dans la coque client (aligné redirection web App.tsx).
+    LaunchedEffect(isLoggedIn, role) {
+        if (isLoggedIn && ProfileVisibility.usesDedicatedShell(role)) {
+            onStaffLogin(role)
+        }
     }
 
     val showFab = isLoggedIn && canClientSpace && currentTab != TabType.PROFILE
@@ -162,14 +170,9 @@ fun MainContainerScreen(
         ) {
             when (currentTab) {
                 TabType.HOME -> when {
-                    isLoggedIn && UserRoles.usesDedicatedShell(role) -> {
+                    isLoggedIn && ProfileVisibility.usesDedicatedShell(role) -> {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                "Reconnectez-vous pour accéder à votre espace ${roleDisplayLabel(role)}.",
-                                color = Gray600,
-                                modifier = Modifier.padding(24.dp),
-                                textAlign = TextAlign.Center,
-                            )
+                            CircularProgressIndicator(color = OrangePrimary)
                         }
                     }
                     else -> MobileHomeScreen(
@@ -222,7 +225,13 @@ fun MainContainerScreen(
                     if (!isLoggedIn) {
                         LoginScreen(
                             authViewModel = authViewModel,
-                            onLoginSuccess = { currentTab = TabType.HOME },
+                            onLoginSuccess = { role ->
+                                if (ProfileVisibility.usesDedicatedShell(role)) {
+                                    onStaffLogin(role)
+                                } else {
+                                    currentTab = TabType.HOME
+                                }
+                            },
                         )
                     } else {
                         ClientProfileScreen(

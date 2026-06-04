@@ -2,6 +2,7 @@ import express from 'express';
 import crypto from 'crypto';
 import { authenticate, AuthRequest, requireRole } from '../middleware/auth';
 import { pool } from '../db/connection';
+import dispatchService from '../services/dispatchService';
 const router = express.Router();
 export const paymentsWebhookRouter = express.Router();
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || '';
@@ -24,6 +25,45 @@ const getRelayPointIdForUser = async (userId: string): Promise<string | null> =>
   const relayId = relayResult.rows[0]?.relay_point_id;
   return relayId ? String(relayId) : null;
 };
+
+const shipmentRowAmountFcfa = (row: any): number =>
+  toNumber(row?.price) + toNumber(row?.printing_fee) + toNumber(row?.assistance_fee) + toNumber(row?.box_price);
+
+// Montant total attendu (en kobo) pour une liste de colis, recalculé depuis la DB.
+// Source de vérité serveur : ne jamais faire confiance au montant envoyé par le client.
+async function getExpectedAmountKobo(trackingNumbers: string[]): Promise<{ kobo: number; found: string[] }> {
+  if (!trackingNumbers.length) return { kobo: 0, found: [] };
+  const placeholders = trackingNumbers.map((_, i) => `$${i + 1}`).join(', ');
+  const r = await pool.query(
+    `SELECT tracking_number, price, printing_fee, assistance_fee, box_price
+     FROM shipments WHERE tracking_number IN (${placeholders})`,
+    trackingNumbers
+  );
+  const totalFcfa = r.rows.reduce((s: number, row: any) => s + shipmentRowAmountFcfa(row), 0);
+  return { kobo: Math.round(totalFcfa * 100), found: r.rows.map((row: any) => String(row.tracking_number)) };
+}
+
+// Le montant payé (kobo, fourni par le provider) doit couvrir le montant attendu.
+const amountCovers = (paidKobo: number, expectedKobo: number): boolean =>
+  Number.isFinite(paidKobo) && expectedKobo > 0 && paidKobo >= expectedKobo;
+
+// Après confirmation de paiement, lance la recherche de livreur (style Uber)
+// pour les colis en ramassage à domicile. dispatchShipment ignore les non-home_pickup
+// et est idempotent (garde contre une offre déjà active). Fire-and-forget : un échec
+// de dispatch ne doit jamais faire échouer la confirmation de paiement.
+async function dispatchHomePickups(trackingNumbers: string[]): Promise<void> {
+  if (!trackingNumbers.length) return;
+  const placeholders = trackingNumbers.map((_, i) => `$${i + 1}`).join(', ');
+  const r = await pool.query(
+    `SELECT id FROM shipments WHERE tracking_number IN (${placeholders}) AND pickup_method = 'home_pickup'`,
+    trackingNumbers
+  );
+  for (const row of r.rows) {
+    dispatchService.dispatchShipment(String(row.id)).catch((err: any) =>
+      console.error(`[Dispatch] échec dispatch colis ${row.id}:`, err?.message)
+    );
+  }
+}
 
 // Paystack Webhook (mounted before JSON parser — raw body needed for signature)
 paymentsWebhookRouter.post('/', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -48,6 +88,7 @@ paymentsWebhookRouter.post('/', express.raw({ type: 'application/json' }), async
       const ref = event.data?.reference;
       const trackingNumber = event.data?.metadata?.tracking_number;
       const batchRef = event.data?.metadata?.batch_ref;
+      const paidKobo = toNumber(event.data?.amount);
 
       await pool.query(
         `UPDATE automated_payments
@@ -75,36 +116,48 @@ paymentsWebhookRouter.post('/', express.raw({ type: 'application/json' }), async
             console.error('[Paystack] Batch raw_response parse error:', parseErr.message);
           }
           if (trackingNumbers.length > 0) {
-            const placeholders = trackingNumbers.map((_: string, i: number) => `$${i + 1}`).join(', ');
-            await pool.query(
-              `UPDATE shipments SET payment_status = 'paid', payment_method = 'paystack', updated_at = NOW()
-               WHERE tracking_number IN (${placeholders}) AND payment_status = 'pending'`,
-              trackingNumbers
-            );
-            for (const tn of trackingNumbers) {
+            const { kobo: expectedKobo } = await getExpectedAmountKobo(trackingNumbers);
+            if (!amountCovers(paidKobo, expectedKobo)) {
+              console.error(`[Paystack] Batch amount mismatch — paid=${paidKobo} expected=${expectedKobo} (ref: ${ref}); shipments NOT marked paid: ${trackingNumbers.join(', ')}`);
+            } else {
+              const placeholders = trackingNumbers.map((_: string, i: number) => `$${i + 1}`).join(', ');
               await pool.query(
-                `INSERT INTO shipment_tracking (shipment_id, status, notes, created_at)
-                 SELECT id, 'PAYMENT_CONFIRMED', 'Paiement batch confirmé via Paystack (ref: ' || $2 || ')', NOW()
-                 FROM shipments WHERE tracking_number = $1`,
-                [tn, ref]
+                `UPDATE shipments SET payment_status = 'paid', payment_method = 'paystack', updated_at = NOW()
+                 WHERE tracking_number IN (${placeholders}) AND payment_status = 'pending'`,
+                trackingNumbers
               );
+              for (const tn of trackingNumbers) {
+                await pool.query(
+                  `INSERT INTO shipment_tracking (shipment_id, status, notes, created_at)
+                   SELECT id, 'PAYMENT_CONFIRMED', 'Paiement batch confirmé via Paystack (ref: ' || $2 || ')', NOW()
+                   FROM shipments WHERE tracking_number = $1`,
+                  [tn, ref]
+                );
+              }
+              console.info(`[Paystack] Batch payment confirmed: ${trackingNumbers.join(', ')} (ref: ${ref})`);
+              await dispatchHomePickups(trackingNumbers);
             }
-            console.info(`[Paystack] Batch payment confirmed: ${trackingNumbers.join(', ')} (ref: ${ref})`);
           }
         }
       } else if (trackingNumber && !trackingNumber.startsWith('BATCH-')) {
-        await pool.query(
-          `UPDATE shipments SET payment_status = 'paid', payment_method = 'paystack', updated_at = NOW()
-           WHERE tracking_number = $1 AND payment_status = 'pending'`,
-          [trackingNumber]
-        );
-        await pool.query(
-          `INSERT INTO shipment_tracking (shipment_id, status, notes, created_at)
-           SELECT id, 'PAYMENT_CONFIRMED', 'Paiement confirmé via Paystack (ref: ' || $2 || ')', NOW()
-           FROM shipments WHERE tracking_number = $1`,
-          [trackingNumber, ref]
-        );
-        console.info(`[Paystack] Payment confirmed: ${trackingNumber} (ref: ${ref})`);
+        const { kobo: expectedKobo } = await getExpectedAmountKobo([trackingNumber]);
+        if (!amountCovers(paidKobo, expectedKobo)) {
+          console.error(`[Paystack] Amount mismatch — paid=${paidKobo} expected=${expectedKobo} for ${trackingNumber} (ref: ${ref}); shipment NOT marked paid`);
+        } else {
+          await pool.query(
+            `UPDATE shipments SET payment_status = 'paid', payment_method = 'paystack', updated_at = NOW()
+             WHERE tracking_number = $1 AND payment_status = 'pending'`,
+            [trackingNumber]
+          );
+          await pool.query(
+            `INSERT INTO shipment_tracking (shipment_id, status, notes, created_at)
+             SELECT id, 'PAYMENT_CONFIRMED', 'Paiement confirmé via Paystack (ref: ' || $2 || ')', NOW()
+             FROM shipments WHERE tracking_number = $1`,
+            [trackingNumber, ref]
+          );
+          console.info(`[Paystack] Payment confirmed: ${trackingNumber} (ref: ${ref})`);
+          await dispatchHomePickups([trackingNumber]);
+        }
       }
     }
   } catch (err: any) {
@@ -390,7 +443,7 @@ async function initPaystack(payload: InitPayload, res: express.Response, batch_r
 
   const emailRegex = /^[a-zA-Z0-9._%\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
   const trimmedEmail = (customer_email || '').trim();
-  const resolvedEmail = emailRegex.test(trimmedEmail) ? trimmedEmail : 'paiement@colisdirect.ci';
+  const resolvedEmail = emailRegex.test(trimmedEmail) ? trimmedEmail : 'paiement@colisdirect.com';
 
 
   const reference = `PS-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -450,6 +503,10 @@ async function initCinetpay(payload: InitPayload, res: express.Response, batch_r
     return res.status(503).json({ error: 'CINETPAY_NOT_CONFIGURED — renseignez CINETPAY_API_KEY et CINETPAY_SITE_ID' });
   }
 
+  const emailRegexCp = /^[a-zA-Z0-9._%\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+  const trimmedEmailCp = (customer_email || '').trim();
+  const resolvedEmailCp = emailRegexCp.test(trimmedEmailCp) ? trimmedEmailCp : 'paiement@colisdirect.com';
+
   const transactionId = `CP-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
   const cpPayload = {
     apikey: apiKey, site_id: siteId, transaction_id: transactionId,
@@ -457,7 +514,7 @@ async function initCinetpay(payload: InitPayload, res: express.Response, batch_r
     description: `Colis Direct - ${tracking_number}`,
     notify_url: `${backendUrl}/api/payments/cinetpay/notify`,
     return_url: `${frontendUrl}/#/payment-success?tracking=${tracking_number}`,
-    channels: 'ALL', customer_name, customer_email,
+    channels: 'ALL', customer_name, customer_email: resolvedEmailCp,
     customer_phone_number: customer_phone, customer_country: 'CI', customer_state: 'CI',
   };
 
@@ -472,11 +529,22 @@ async function initCinetpay(payload: InitPayload, res: express.Response, batch_r
     return res.status(502).json({ error: cpData?.message || 'Erreur lors de l\'initialisation du paiement' });
   }
 
-  await pool.query(
-    `INSERT INTO automated_payments (tracking_number, provider, transaction_id, amount, payment_url, raw_response)
-     VALUES ($1, 'cinetpay', $2, $3, $4, $5) ON CONFLICT DO NOTHING`,
-    [tracking_number, transactionId, amount_fcfa, cpData.data.payment_url, JSON.stringify(cpData)]
-  );
+  // Pour un batch : mettre à jour la ligne batch_pending (transaction_id = batch_ref) avec la vraie
+  // référence CinetPay, en FUSIONNANT raw_response (||) pour préserver les tracking_numbers du lot.
+  // Sinon /cinetpay/notify ne retrouve pas les colis du batch (bug historique : batch_ref ignoré).
+  if (batch_ref) {
+    await pool.query(
+      `UPDATE automated_payments SET transaction_id = $1, payment_url = $2, raw_response = raw_response || $3::jsonb, updated_at = NOW()
+       WHERE transaction_id = $4`,
+      [transactionId, cpData.data.payment_url, JSON.stringify(cpData), batch_ref]
+    );
+  } else {
+    await pool.query(
+      `INSERT INTO automated_payments (tracking_number, provider, transaction_id, amount, payment_url, raw_response)
+       VALUES ($1, 'cinetpay', $2, $3, $4, $5) ON CONFLICT DO NOTHING`,
+      [tracking_number, transactionId, amount_fcfa, cpData.data.payment_url, JSON.stringify(cpData)]
+    );
+  }
   return res.json({ payment_url: cpData.data.payment_url, transaction_id: transactionId });
 }
 
@@ -640,35 +708,39 @@ router.post('/cinetpay/notify', async (req: express.Request, res: express.Respon
     if (isPaid) {
       await pool.query(
         `UPDATE automated_payments
-         SET status = $1, webhook_received_at = NOW(), raw_response = raw_response || $2::jsonb, updated_at = NOW()
-         WHERE transaction_id = $3`,
-        [isPaid ? 'confirmed' : 'failed', JSON.stringify(verifyData), cpm_trans_id]
+         SET status = 'confirmed', webhook_received_at = NOW(), raw_response = raw_response || $1::jsonb, updated_at = NOW()
+         WHERE transaction_id = $2`,
+        [JSON.stringify(verifyData), cpm_trans_id]
       );
 
-      // Vérifier si c'est un batch (transaction_id commence par PS- et raw_response contient tracking_numbers)
+      // Résoudre les colis : batch (tracking_numbers dans raw_response) ou colis simple
       const apRow = await pool.query(
-        `SELECT raw_response FROM automated_payments WHERE transaction_id = $1`,
+        `SELECT tracking_number, raw_response FROM automated_payments WHERE transaction_id = $1`,
         [cpm_trans_id]
       );
-      let batchTrackings: string[] = [];
+      let trackingNumbers: string[] = [];
       try {
         const raw = apRow.rows[0]?.raw_response;
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        if (Array.isArray(parsed?.tracking_numbers)) batchTrackings = parsed.tracking_numbers;
+        if (Array.isArray(parsed?.tracking_numbers)) trackingNumbers = parsed.tracking_numbers;
       } catch { /* ignore */ }
+      if (trackingNumbers.length === 0 && apRow.rows[0]?.tracking_number) {
+        trackingNumbers = [String(apRow.rows[0].tracking_number)];
+      }
 
-      if (batchTrackings.length > 0) {
-        const ph = batchTrackings.map((_: string, i: number) => `$${i + 1}`).join(', ');
+      // CinetPay renvoie le montant en FCFA (pas en kobo) → ×100 pour comparer.
+      const paidKobo = toNumber(verifyData?.data?.amount) * 100;
+      const { kobo: expectedKobo } = await getExpectedAmountKobo(trackingNumbers);
+      if (!amountCovers(paidKobo, expectedKobo)) {
+        console.error(`[CinetPay] amount mismatch — paid=${paidKobo} expected=${expectedKobo} (tx: ${cpm_trans_id}); shipments NOT marked paid`);
+      } else if (trackingNumbers.length > 0) {
+        const ph = trackingNumbers.map((_: string, i: number) => `$${i + 1}`).join(', ');
         await pool.query(
-          `UPDATE shipments SET payment_status = 'paid', updated_at = NOW() WHERE tracking_number IN (${ph})`,
-          batchTrackings
+          `UPDATE shipments SET payment_status = 'paid', payment_method = 'cinetpay', updated_at = NOW()
+           WHERE tracking_number IN (${ph}) AND payment_status = 'pending'`,
+          trackingNumbers
         );
-      } else {
-        await pool.query(
-          `UPDATE shipments SET payment_status = 'paid', updated_at = NOW()
-           WHERE tracking_number = (SELECT tracking_number FROM automated_payments WHERE transaction_id = $1)`,
-          [cpm_trans_id]
-        );
+        await dispatchHomePickups(trackingNumbers);
       }
     } else {
       await pool.query(
@@ -701,48 +773,78 @@ router.post('/paystack/verify', async (req: express.Request, res: express.Respon
       headers: { Authorization: `Bearer ${secretKey}` },
     });
     const verifyData: any = await verifyRes.json();
-    const isPaid = verifyData?.data?.status === 'success';
+    const isSuccess = verifyData?.data?.status === 'success';
+    const paidKobo = toNumber(verifyData?.data?.amount);
     const metaBatchRef: string | null = verifyData?.data?.metadata?.batch_ref || null;
+    const metaTracking: string | null = verifyData?.data?.metadata?.tracking_number || null;
 
-    if (isPaid) {
+    // Matérialise / met à jour la transaction côté serveur. Le flux popup inline ne crée
+    // aucune ligne automated_payments à l'init → on la crée ici (UPDATE puis INSERT si absente).
+    const upd = await pool.query(
+      `UPDATE automated_payments
+       SET status = $1, raw_response = COALESCE(raw_response, '{}'::jsonb) || $2::jsonb, updated_at = NOW()
+       WHERE transaction_id = $3`,
+      [isSuccess ? 'confirmed' : 'failed', JSON.stringify(verifyData?.data ?? {}), reference]
+    );
+    if (upd.rowCount === 0) {
       await pool.query(
-        `UPDATE automated_payments SET status = 'confirmed', updated_at = NOW() WHERE transaction_id = $1`,
-        [reference]
+        `INSERT INTO automated_payments (tracking_number, provider, transaction_id, amount, status, raw_response)
+         VALUES ($1, 'paystack', $2, $3, $4, $5::jsonb)`,
+        [metaTracking || tracking_number || null, reference, paidKobo / 100, isSuccess ? 'confirmed' : 'failed', JSON.stringify(verifyData?.data ?? {})]
       );
-
-      if (metaBatchRef) {
-        // Paiement batch : récupérer les tracking_numbers depuis raw_response
-        const batchRow = await pool.query(
-          `SELECT raw_response FROM automated_payments WHERE transaction_id = $1`,
-          [reference]
-        );
-        let batchTrackings: string[] = [];
-        try {
-          const raw = batchRow.rows[0]?.raw_response;
-          const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-          if (Array.isArray(parsed?.tracking_numbers)) batchTrackings = parsed.tracking_numbers;
-        } catch { /* ignore */ }
-        if (batchTrackings.length > 0) {
-          const ph = batchTrackings.map((_: string, i: number) => `$${i + 1}`).join(', ');
-          await pool.query(
-            `UPDATE shipments SET payment_status = 'paid', updated_at = NOW() WHERE tracking_number IN (${ph})`,
-            batchTrackings
-          );
-        }
-      } else if (tracking_number) {
-        await pool.query(
-          `UPDATE shipments SET payment_status = 'paid', updated_at = NOW() WHERE tracking_number = $1`,
-          [tracking_number]
-        );
-      }
     }
 
-    return res.json({
-      paid: isPaid,
-      status: verifyData?.data?.status,
-      amount: verifyData?.data?.amount,
-      reference,
-    });
+    if (!isSuccess) {
+      return res.json({ paid: false, status: verifyData?.data?.status, reference });
+    }
+
+    // Déterminer les colis concernés (batch via raw_response, sinon le colis demandé)
+    let trackingNumbers: string[] = [];
+    if (metaBatchRef) {
+      const batchRow = await pool.query(
+        `SELECT raw_response FROM automated_payments WHERE transaction_id = $1`,
+        [reference]
+      );
+      try {
+        const raw = batchRow.rows[0]?.raw_response;
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (Array.isArray(parsed?.tracking_numbers)) trackingNumbers = parsed.tracking_numbers;
+      } catch { /* ignore */ }
+    } else if (tracking_number) {
+      // Anti-rejeu : la transaction Paystack doit cibler le colis demandé
+      if (metaTracking && metaTracking !== tracking_number) {
+        console.warn(`[Paystack] verify tracking mismatch: meta=${metaTracking} req=${tracking_number} (ref: ${reference})`);
+        return res.json({ paid: false, status: 'tracking_mismatch', reference });
+      }
+      trackingNumbers = [tracking_number];
+    }
+
+    // Vérification du montant côté serveur (source de vérité = prix DB)
+    const { kobo: expectedKobo } = await getExpectedAmountKobo(trackingNumbers);
+    if (!amountCovers(paidKobo, expectedKobo)) {
+      console.error(`[Paystack] verify amount mismatch — paid=${paidKobo} expected=${expectedKobo} (ref: ${reference}); NOT marking paid`);
+      return res.json({ paid: false, status: 'amount_mismatch', reference, amount: paidKobo, expected: expectedKobo });
+    }
+
+    if (trackingNumbers.length > 0) {
+      const ph = trackingNumbers.map((_: string, i: number) => `$${i + 1}`).join(', ');
+      await pool.query(
+        `UPDATE shipments SET payment_status = 'paid', payment_method = 'paystack', updated_at = NOW()
+         WHERE tracking_number IN (${ph}) AND payment_status = 'pending'`,
+        trackingNumbers
+      );
+      for (const tn of trackingNumbers) {
+        await pool.query(
+          `INSERT INTO shipment_tracking (shipment_id, status, notes, created_at)
+           SELECT id, 'PAYMENT_CONFIRMED', 'Paiement confirmé via Paystack (ref: ' || $2 || ')', NOW()
+           FROM shipments WHERE tracking_number = $1`,
+          [tn, reference]
+        );
+      }
+      await dispatchHomePickups(trackingNumbers);
+    }
+
+    return res.json({ paid: true, status: verifyData?.data?.status, amount: paidKobo, reference });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

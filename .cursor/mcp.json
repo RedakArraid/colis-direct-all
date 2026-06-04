@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "mobile-mcp": {
+      "type": "stdio",
+      "command": "mcp-server-mobile",
+      "args": ["--stdio"],
+      "env": {
+        "ANDROID_HOME": "/Users/kader/Library/Android/sdk",
+        "PATH": "/Users/kader/Library/Android/sdk/platform-tools:/Users/kader/Library/Android/sdk/emulator:/Users/kader/.local/bin:/usr/local/bin:/usr/bin:/bin",
+        "MOBILEMCP_DISABLE_TELEMETRY": "1"
+      }
+    }
+  }
+}

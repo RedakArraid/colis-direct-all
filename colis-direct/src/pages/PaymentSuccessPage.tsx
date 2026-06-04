@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 import DepositRelayFinder from '../components/shipment/DepositRelayFinder';
+import DriverSearch from '../components/shipment/DriverSearch';
 import { useCart } from '../contexts/CartContext';
 import { normalizePaymentStatus, getPaymentStatusLabel } from '../utils/shipmentStatus';
 import { BasePageProps } from '../types/pages';
@@ -365,6 +366,13 @@ function PaymentSuccessPage({ onNavigate }: PaymentSuccessPageProps) {
             <button onClick={() => onNavigate('home')} className="px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base border rounded-lg hover:bg-[#F6F7F9] transition-colors">Retour à l'accueil</button>
           </div>
         </div>
+
+        {/* Ramassage à domicile : recherche de livreur en direct (style Uber) */}
+        {shipment && shipment.pickup_method === 'home_pickup' && trackingNumber && !trackingNumber.startsWith('BATCH-') && (
+          <div className="mb-6">
+            <DriverSearch trackingNumber={trackingNumber} />
+          </div>
+        )}
 
         {/* Trouvez un point relais de dépôt — uniquement pour livraison en relais */}
         {shipment && !shipment.home_delivery && (

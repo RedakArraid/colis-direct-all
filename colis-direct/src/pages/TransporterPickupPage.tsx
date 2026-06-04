@@ -472,7 +472,6 @@ function TransporterPickupPage() {
                         <div className="space-y-3 pl-2 border-l-2 border-blue-100 ml-3">
                         {byCommune[commune].map((shipment) => {
                           stopIndex++;
-                          const _stopNum = stopIndex;
                     const icon = getPaymentStatusIcon(shipment);
                     const isExpanded = expandedShipments.has(shipment.tracking_number);
                     const needsPayment = icon === 'pending';

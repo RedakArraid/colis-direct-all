@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Check, Truck, MapPin, Upload, Loader2, AlertCircle,
-  Bike, Car, User, Star, Shield, Banknote
+  Bike, User, Star, Shield, Banknote
 } from 'lucide-react';
 import PhoneInput from '../components/PhoneInput';
 import CommuneSelect from '../components/CommuneSelect';

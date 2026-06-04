@@ -4,6 +4,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
@@ -11,10 +12,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import ci.colisdirect.app.domain.ProfileVisibility
@@ -98,14 +101,29 @@ object Routes {
         "payment_success/$tracking?relayCash=$relayCash"
 }
 
+private fun NavHostController.navigateToDedicatedShell(
+    role: String?,
+    popUpToRoute: String,
+    popInclusive: Boolean,
+) {
+    val dest = when (ProfileVisibility.dedicatedShellRoute(role)) {
+        "courier_main" -> Routes.COURIER_MAIN
+        "relay_main" -> Routes.RELAY_MAIN
+        "admin_main" -> Routes.ADMIN_MAIN
+        "support_main" -> Routes.SUPPORT_MAIN
+        else -> return
+    }
+    navigate(dest) {
+        popUpTo(popUpToRoute) { inclusive = popInclusive }
+    }
+}
+
 @Composable
 fun AppNavGraph() {
     val navController = rememberNavController()
     val authViewModel: AuthViewModel = hiltViewModel()
-    val clientGraphEntry = remember(navController) {
-        navController.getBackStackEntry(navController.graph.id)
-    }
-    val clientViewModel: ClientViewModel = hiltViewModel(clientGraphEntry)
+    val activity = LocalContext.current as ComponentActivity
+    val clientViewModel: ClientViewModel = hiltViewModel(activity)
     var trackingPrefillFromNotif by remember { mutableStateOf<String?>(null) }
 
     CompositionLocalProvider(LocalClientViewModel provides clientViewModel) {
@@ -121,15 +139,12 @@ fun AppNavGraph() {
             SplashScreen(
                 authViewModel = authViewModel,
                 onNavigate = { role ->
-                    val dest = when (ProfileVisibility.dedicatedShellRoute(role)) {
-                        "courier_main" -> Routes.COURIER_MAIN
-                        "relay_main" -> Routes.RELAY_MAIN
-                        "admin_main" -> Routes.ADMIN_MAIN
-                        "support_main" -> Routes.SUPPORT_MAIN
-                        else -> Routes.MAIN_CONTAINER
-                    }
-                    navController.navigate(dest) {
-                        popUpTo(Routes.SPLASH) { inclusive = true }
+                    if (ProfileVisibility.usesDedicatedShell(role)) {
+                        navController.navigateToDedicatedShell(role, Routes.SPLASH, popInclusive = true)
+                    } else {
+                        navController.navigate(Routes.MAIN_CONTAINER) {
+                            popUpTo(Routes.SPLASH) { inclusive = true }
+                        }
                     }
                 },
                 onNotLoggedIn = {
@@ -189,6 +204,9 @@ fun AppNavGraph() {
 
         composable(Routes.MAIN_CONTAINER) {
             MainContainerScreen(
+                onStaffLogin = { role ->
+                    navController.navigateToDedicatedShell(role, Routes.MAIN_CONTAINER, popInclusive = true)
+                },
                 onCreateShipment = { navController.navigate(Routes.CREATE_SHIPMENT) },
                 onShipmentClick = { id -> navController.navigate("shipment_detail/$id") },
                 onNotifications = { navController.navigate(Routes.NOTIFICATIONS) },

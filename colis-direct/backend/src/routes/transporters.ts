@@ -155,6 +155,32 @@ router.patch('/:id', authenticate, requireRole('admin'), async (req: AuthRequest
   }
 });
 
+// Le livreur pousse sa position GPS (suivi temps réel côté expéditeur).
+router.post('/me/location', authenticate, requireRole('transporter'), async (req: AuthRequest, res) => {
+  try {
+    const { latitude, longitude } = req.body || {};
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      return res.status(400).json({ error: 'Coordonnées GPS invalides' });
+    }
+    const result = await pool.query(
+      `UPDATE transporters
+       SET current_latitude = $1, current_longitude = $2, location_updated_at = NOW()
+       WHERE user_id = $3
+       RETURNING id`,
+      [lat, lng, req.user!.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Profil transporteur non trouvé' });
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Update transporter location error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Delete transporter
 router.delete('/:id', authenticate, requireRole('admin'), async (req: AuthRequest, res) => {
   try {

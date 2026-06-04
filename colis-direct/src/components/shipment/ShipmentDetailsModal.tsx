@@ -112,7 +112,6 @@ export default function ShipmentDetailsModal({ shipmentId, onClose }: ShipmentDe
 
   if (!shipmentId) return null;
 
-  const logisticStatus = shipment ? normalizeShipmentStatus(shipment.current_status ?? shipment.status) : null;
   const logisticLabel = shipment ? getDeliveryStatusLabel(shipment) : '—';
   const logisticBadgeClass = shipment ? getDeliveryStatusBadgeClass(shipment as any) : 'bg-[#F6F7F9] text-[#1A1A1A]';
 

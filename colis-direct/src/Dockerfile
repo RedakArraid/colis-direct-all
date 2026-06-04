@@ -9,6 +9,9 @@ RUN apk add --no-cache bash
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 
+ARG VITE_PAYSTACK_PUBLIC_KEY
+ENV VITE_PAYSTACK_PUBLIC_KEY=$VITE_PAYSTACK_PUBLIC_KEY
+
 # Copy package files first for better caching
 # Note: context is project root, paths are relative to context
 COPY package*.json ./

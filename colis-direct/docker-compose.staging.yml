@@ -83,6 +83,7 @@ services:
       dockerfile: src/Dockerfile
       args:
         VITE_API_URL: ${VITE_STAGING_API_URL:-https://staging-api.colisdirect.com/api}
+        VITE_PAYSTACK_PUBLIC_KEY: ${VITE_PAYSTACK_PUBLIC_KEY:-}
     container_name: colisdirect-frontend-staging
     env_file:
       - .env.staging

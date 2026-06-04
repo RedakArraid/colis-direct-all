@@ -2,6 +2,7 @@ import { CheckCircle, FileText, Eye, AlertCircle, DollarSign, Download } from 'l
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../lib/api';
 import DepositRelayFinder from './DepositRelayFinder';
+import DriverSearch from './DriverSearch';
 import { useState, useEffect } from 'react';
 import {
   normalizePaymentStatus,
@@ -551,6 +552,13 @@ function ConfirmationStep({
           </li>
         </ul>
       </div>
+
+      {/* Ramassage à domicile : recherche de livreur en direct (style Uber) */}
+      {pickupMethod === 'home_pickup' && (
+        <div className="max-w-3xl mx-auto w-full">
+          <DriverSearch trackingNumber={trackingNumber} />
+        </div>
+      )}
 
       {/* Trouvez un point relais de dépôt — pour tous les modes relay_deposit (relay→relay et relay→home) */}
       {pickupMethod === 'relay_deposit' && (

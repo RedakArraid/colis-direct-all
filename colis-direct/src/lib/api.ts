@@ -725,6 +725,35 @@ class ApiClient {
     return this.request<any>(`/delivery-offers/${offerId}/decline`, { method: 'POST' });
   }
 
+  // Suivi de la recherche de livreur (côté expéditeur, home_pickup)
+  async getDispatchStatus(trackingNumber: string) {
+    return this.request<{
+      state: 'not_applicable' | 'searching' | 'assigned' | 'no_driver';
+      pickup?: { latitude: number | null; longitude: number | null };
+      offers_sent?: number;
+      round?: number;
+      driver?: {
+        first_name: string;
+        last_name: string;
+        phone: string;
+        vehicle_type: string;
+        license_plate: string | null;
+        transporter_code: string | null;
+        latitude: number | null;
+        longitude: number | null;
+        location_updated_at: string | null;
+      } | null;
+    }>(`/tracking/${trackingNumber}/dispatch-status`);
+  }
+
+  // Le livreur pousse sa position GPS (suivi temps réel)
+  async updateMyLocation(latitude: number, longitude: number) {
+    return this.request<{ success: boolean }>('/transporters/me/location', {
+      method: 'POST',
+      body: JSON.stringify({ latitude, longitude }),
+    });
+  }
+
   async getTransporterWallet() {
     return this.request<{ wallet: any; stats: { today: number; week: number; month: number } }>('/transporter/wallet');
   }

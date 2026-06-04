@@ -10,6 +10,8 @@
 **`development/`**
 - [`WORKFLOW_SOLO.md`](guides/development/WORKFLOW_SOLO.md) — **Référence** : workflow `dev → staging → main`, règles Git, boucle locale
 - [`WORKFLOW_DEV_STAGING_PROD.md`](guides/development/WORKFLOW_DEV_STAGING_PROD.md) — Détail des commandes par étape
+- [`MOBILE_EMULATORS.md`](guides/development/MOBILE_EMULATORS.md) — Android natif, iOS Capacitor, simulateur
+- [`ANDROID_NATIVE.md`](guides/development/ANDROID_NATIVE.md) — **App Android Kotlin** : build, rôles, E2E, parité web
 
 **`configuration/`**
 - [`VARIABLES_ENVIRONNEMENT.md`](guides/configuration/VARIABLES_ENVIRONNEMENT.md) — Référence de toutes les variables d'environnement
@@ -54,4 +56,4 @@
 
 ---
 
-*Mise à jour : mai 2026.*
+*Mise à jour : juin 2026 — Android natif dans `android/`, Capacitor Android retiré.*

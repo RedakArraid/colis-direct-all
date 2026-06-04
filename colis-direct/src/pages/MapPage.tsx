@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { MapPin, Phone, Clock, Search, Navigation, Loader2, X, Package } from 'lucide-react';
 import Footer from '../components/Footer';
 import Chatbot from '../components/Chatbot';
@@ -179,30 +179,7 @@ function MapPage() {
     return typeMap[type] || type;
   };
 
-  const getMapBounds = () => {
-    const pointsWithCoords = filteredRelays.filter(rp => rp.latitude && rp.longitude);
-    if (pointsWithCoords.length === 0) return null;
-    const lats = pointsWithCoords.map(rp => Number(rp.latitude));
-    const lngs = pointsWithCoords.map(rp => Number(rp.longitude));
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    const minLng = Math.min(...lngs);
-    const maxLng = Math.max(...lngs);
-    const latPadding = (maxLat - minLat) * 0.1 || 0.01;
-    const lngPadding = (maxLng - minLng) * 0.1 || 0.01;
-    return { minLat: minLat - latPadding, maxLat: maxLat + latPadding, minLng: minLng - lngPadding, maxLng: maxLng + lngPadding };
-  };
 
-  const bounds = getMapBounds();
-
-  const buildMapUrl = () => {
-    if (filteredRelays.length === 0) return `https://www.openstreetmap.org/export/embed.html?bbox=-4.2,5.1,-3.9,5.4&layer=mapnik&marker=5.316667,-4.033333`;
-    const pointsWithCoords = filteredRelays.filter(rp => rp.latitude && rp.longitude);
-    if (pointsWithCoords.length === 0) return `https://www.openstreetmap.org/export/embed.html?bbox=-4.2,5.1,-3.9,5.4&layer=mapnik`;
-    const bbox = bounds ? `${bounds.minLng},${bounds.minLat},${bounds.maxLng},${bounds.maxLat}` : '-4.2,5.1,-3.9,5.4';
-    const markers = pointsWithCoords.map(rp => `${Number(rp.latitude)},${Number(rp.longitude)}`).join('&marker=');
-    return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${markers}`;
-  };
 
   // Sidebar commune chips derived from actual data + design defaults
   const sidebarChips = COMMUNE_CHIPS.filter(c => communes.includes(c)).length > 0 ? COMMUNE_CHIPS : communes.slice(0, 6);

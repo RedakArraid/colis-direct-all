@@ -83,6 +83,10 @@ out/
 colis-direct-android/
 colis-direct/www/
 
+# Maquette design locale (référence JSX, pas l'app)
+colisdirect-maquette/
+colisdirect.zip
+
 # MCP Android — clones optionnels locaux
 colis-direct/tools/
 

@@ -100,6 +100,7 @@ services:
       dockerfile: src/Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-https://api.colisdirect.com/api}
+        VITE_PAYSTACK_PUBLIC_KEY: ${VITE_PAYSTACK_PUBLIC_KEY:-}
     container_name: colisdirect-frontend
     env_file:
       - .env.production

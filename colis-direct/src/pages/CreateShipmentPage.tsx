@@ -505,17 +505,6 @@ function CreateShipmentPage({ onNavigate }: CreateShipmentPageProps) {
             />
           )}
 
-          {currentStep === 'automated-payment' && automatedPaymentContext && (
-            <AutomatedPaymentStep
-              trackingNumber={automatedPaymentContext.trackingNumber}
-              amountFcfa={automatedPaymentContext.amountFcfa}
-              customerName={automatedPaymentContext.customerName}
-              customerEmail={automatedPaymentContext.customerEmail}
-              customerPhone={automatedPaymentContext.customerPhone}
-              onBack={() => setCurrentStep('summary')}
-            />
-          )}
-
           {currentStep === 'confirmation' && formData && (
             <ConfirmationStep
               trackingNumber={trackingNumber}
@@ -534,6 +523,20 @@ function CreateShipmentPage({ onNavigate }: CreateShipmentPageProps) {
           )}
         </div>
       </div>
+
+      {/* Modal de paiement en ligne (Paystack Inline) pour l'étape automated-payment */}
+      {currentStep === 'automated-payment' && automatedPaymentContext && (
+        <div className="fixed inset-0 z-[100] overflow-y-auto">
+          <AutomatedPaymentStep
+            trackingNumber={automatedPaymentContext.trackingNumber}
+            amountFcfa={automatedPaymentContext.amountFcfa}
+            customerName={automatedPaymentContext.customerName}
+            customerEmail={automatedPaymentContext.customerEmail}
+            customerPhone={automatedPaymentContext.customerPhone}
+            onBack={() => setCurrentStep('summary')}
+          />
+        </div>
+      )}
     </div>
   );
 }
