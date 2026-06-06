@@ -1,12 +1,18 @@
 import { z } from 'zod';
+import { sanitizeOptionalEmail } from '../utils/paymentEmail';
 
 const phoneSchema = z.string().min(8).max(20).regex(/^\+?[0-9][0-9\s\-().]{7,18}$/, 'Numéro de téléphone invalide');
+
+const optionalEmailSchema = z.preprocess(
+  (val) => sanitizeOptionalEmail(val),
+  z.string().email().max(255).nullable().optional(),
+);
 
 export const createShipmentSchema = z.object({
   tracking_number: z.string().max(32).optional(),
   sender_first_name: z.string().min(1).max(100),
   sender_last_name: z.string().min(1).max(100),
-  sender_email: z.string().email().max(255).nullable().optional().or(z.literal('')),
+  sender_email: optionalEmailSchema,
   sender_phone: phoneSchema,
   sender_commune: z.string().min(1).max(100),
   sender_quartier: z.string().max(100).optional().default(''),
@@ -14,7 +20,7 @@ export const createShipmentSchema = z.object({
   sender_repere: z.string().max(300).nullable().optional(),
   recipient_first_name: z.string().min(1).max(100),
   recipient_last_name: z.string().min(1).max(100),
-  recipient_email: z.string().email().max(255).nullable().optional().or(z.literal('')),
+  recipient_email: optionalEmailSchema,
   recipient_phone: phoneSchema,
   recipient_commune: z.string().min(1).max(100),
   recipient_quartier: z.string().max(100).optional().default(''),

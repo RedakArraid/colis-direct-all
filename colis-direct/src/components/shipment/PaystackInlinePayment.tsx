@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { ArrowLeft, Shield, Lock, CheckCircle, XCircle, Loader2, RefreshCw, Check, CreditCard, Wallet } from 'lucide-react';
 import { api } from '../../lib/api';
+import { resolvePaymentEmail } from '../../utils/paymentEmail';
 
 interface PaystackInlinePaymentProps {
   trackingNumber: string;
@@ -24,21 +25,6 @@ declare global {
 type PayStatus = 'idle' | 'loading_sdk' | 'ready' | 'processing' | 'verifying' | 'success' | 'failed' | 'error';
 
 const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '';
-
-const FALLBACK_EMAIL = 'paiement@colisdirect.com';
-
-const isValidEmail = (email: string): boolean => {
-  if (!email || typeof email !== 'string') return false;
-  const trimmed = email.trim();
-  if (!trimmed) return false;
-  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return re.test(trimmed);
-};
-
-const getSafeEmail = (email: string | undefined | null): string => {
-  if (email && isValidEmail(email)) return email.trim();
-  return FALLBACK_EMAIL;
-};
 
 const MOBILE_PROVIDERS = [
   { id: 'orange', label: 'Orange Money', color: '#FF6C00', bg: '#FFF3EB', emoji: '🟠', abbr: 'OM', code: '#144#' },
@@ -213,10 +199,11 @@ export default function PaystackInlinePayment({
     const isCard = selectedProvider === 'card';
     const channels = isCard ? ['card'] : ['mobile_money'];
 
-    const safeEmail = getSafeEmail(customerEmail);
-    console.debug('[Paystack] email used:', safeEmail, '| original:', customerEmail);
+    const safeEmail = resolvePaymentEmail(customerEmail);
 
-    const handler = window.PaystackPop.setup({
+    let handler: { openIframe: () => void };
+    try {
+      handler = window.PaystackPop.setup({
       key: PAYSTACK_PUBLIC_KEY,
       email: safeEmail,
       amount: Math.round(amountFcfa * 100), // en centimes (kobo)
@@ -241,6 +228,16 @@ export default function PaystackInlinePayment({
         setErrorMsg('Paiement annulé. Vous pouvez réessayer quand vous le souhaitez.');
       },
     });
+    } catch (err: any) {
+      setStatus('ready');
+      const msg = String(err?.message || '');
+      if (msg.toLowerCase().includes('email')) {
+        setErrorMsg('Adresse e-mail invalide pour le paiement. Réessayez ou contactez le support.');
+      } else {
+        setErrorMsg(msg || 'Nous n\'avons pas pu lancer cette transaction. Réessayez.');
+      }
+      return;
+    }
 
     handler.openIframe();
   }, [sdkLoaded, amountFcfa, customerEmail, customerName, paymentPhoneNumber, trackingNumber, selectedProvider, verifyAndFinalize]);

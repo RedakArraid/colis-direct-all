@@ -3,6 +3,7 @@ import { Trash2, Package, ShoppingCart, CreditCard, Plus, ArrowLeft, Smartphone,
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
+import { resolvePaymentEmail, sanitizeOptionalEmail } from '../utils/paymentEmail';
 
 interface CartPageProps {
   onNavigate: (page: string) => void;
@@ -77,14 +78,14 @@ function CartPage({ onNavigate }: CartPageProps) {
     tracking_number: trackingNumber,
     sender_first_name: item.formData.sender_first_name,
     sender_last_name: item.formData.sender_last_name,
-    sender_email: item.formData.sender_email || null,
+    sender_email: sanitizeOptionalEmail(item.formData.sender_email),
     sender_phone: item.formData.sender_phone,
     sender_commune: item.formData.sender_commune,
     sender_quartier: item.formData.sender_quartier,
     sender_address: item.formData.sender_address,
     recipient_first_name: item.formData.recipient_first_name,
     recipient_last_name: item.formData.recipient_last_name,
-    recipient_email: item.formData.recipient_email || null,
+    recipient_email: sanitizeOptionalEmail(item.formData.recipient_email),
     recipient_phone: item.formData.recipient_phone,
     recipient_commune: item.formData.recipient_commune,
     recipient_quartier: item.formData.recipient_quartier,
@@ -161,7 +162,7 @@ function CartPage({ onNavigate }: CartPageProps) {
         const { data: batchData, error: batchErr } = await api.initBatchMobileMoneyPayment({
           tracking_numbers: createdTrackingNumbers,
           customer_name: customer,
-          customer_email: user?.email || '',
+          customer_email: resolvePaymentEmail(user?.email),
           customer_phone: user?.phone || selectedItemsList[0]?.formData?.sender_phone || '',
         });
 
@@ -247,7 +248,7 @@ function CartPage({ onNavigate }: CartPageProps) {
               tracking_number: resolvedTracking,
               amount_fcfa: itemTotalPrice,
               customer_name: `${item.formData.sender_first_name} ${item.formData.sender_last_name}`.trim(),
-              customer_email: item.formData.sender_email || user?.email || '',
+              customer_email: resolvePaymentEmail(item.formData.sender_email || user?.email),
               customer_phone: item.formData.sender_phone,
             });
             if (payErr || !payData?.payment_url) {

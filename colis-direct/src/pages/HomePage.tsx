@@ -97,10 +97,6 @@ const HowStep = ({
 
 export default function HomePage({ onNavigate }: HomePageProps) {
   const [trackingNumber, setTrackingNumber] = useState('');
-  const [calcFrom,  setCalcFrom]  = useState('');
-  const [calcTo,    setCalcTo]    = useState('');
-  const [calcSize,  setCalcSize]  = useState<'Petit' | 'Moyen' | 'Grand'>('Petit');
-  const [calcType,  setCalcType]  = useState<'relay' | 'home'>('relay');
 
   const handleTrack = (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,11 +104,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       localStorage.setItem('trackingNumber', trackingNumber.trim());
       onNavigate('tracking');
     }
-  };
-
-  const handleCalc = (e: React.FormEvent) => {
-    e.preventDefault();
-    onNavigate('pricing');
   };
 
   return (
@@ -149,9 +140,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             }}
           />
 
-          {/* Content grid: text+buttons | spacer | calc card */}
+          {/* Content grid: text+buttons | spacer (camion) */}
           <div
-            className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr_380px] gap-6 lg:gap-8 items-center p-6 sm:p-10 lg:px-14 lg:py-16"
+            className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-6 lg:gap-8 items-center p-6 sm:p-10 lg:px-14 lg:py-16"
             style={{ position: 'relative', zIndex: 2 }}
           >
             {/* Left — headline + buttons */}
@@ -184,104 +175,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               </div>
             </div>
 
-            {/* Middle spacer — truck breathes here (desktop only) */}
+            {/* Spacer — camion visible à droite (desktop) */}
             <div className="hidden lg:block" />
-
-            {/* Right — Calc card */}
-            <div
-              style={{
-                background: '#fff', borderRadius: 16, padding: 22,
-                boxShadow: '0 18px 50px rgba(0,0,0,0.15)',
-              }}
-            >
-              <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 16, color: '#1A1A1A' }}>
-                Calculer votre livraison
-              </div>
-              <form onSubmit={handleCalc} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {/* Ville de départ */}
-                <div>
-                  <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 6 }}>Ville de départ</div>
-                  <input
-                    value={calcFrom}
-                    onChange={(e) => setCalcFrom(e.target.value)}
-                    placeholder="Ex : Abidjan"
-                    style={{
-                      width: '100%', border: '1px solid #E6E6E6', borderRadius: 8,
-                      padding: '10px 12px', fontSize: 13, color: '#6B7280', outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
-                {/* Ville d'arrivée */}
-                <div>
-                  <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 6 }}>Ville d'arrivée</div>
-                  <input
-                    value={calcTo}
-                    onChange={(e) => setCalcTo(e.target.value)}
-                    placeholder="Ex : Bouaké"
-                    style={{
-                      width: '100%', border: '1px solid #E6E6E6', borderRadius: 8,
-                      padding: '10px 12px', fontSize: 13, color: '#6B7280', outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
-                {/* Type de livraison */}
-                <div>
-                  <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 6 }}>Type de livraison</div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {(['relay', 'home'] as const).map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setCalcType(t)}
-                        style={{
-                          flex: 1, padding: '9px 0', borderRadius: 8, fontSize: 13, fontWeight: 700,
-                          border: `1.5px solid ${calcType === t ? '#FF6C00' : '#E6E6E6'}`,
-                          background: calcType === t ? '#FFF3E8' : '#fff',
-                          color: calcType === t ? '#FF6C00' : '#3A3A3A',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {t === 'relay' ? 'Point relais' : 'Domicile'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {/* Taille du colis */}
-                <div>
-                  <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 6 }}>Taille du colis</div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {(['Petit', 'Moyen', 'Grand'] as const).map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => setCalcSize(s)}
-                        style={{
-                          flex: 1, padding: '9px 0', borderRadius: 8, fontSize: 13, fontWeight: 700,
-                          border: `1.5px solid ${calcSize === s ? '#FF6C00' : '#E6E6E6'}`,
-                          background: calcSize === s ? '#FFF3E8' : '#fff',
-                          color: calcSize === s ? '#FF6C00' : '#3A3A3A',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <button
-                  type="submit"
-                  style={{
-                    background: '#FF6C00', color: '#fff', border: 'none',
-                    padding: '12px', borderRadius: 10, fontWeight: 700,
-                    fontSize: 14, marginTop: 4, cursor: 'pointer',
-                  }}
-                >
-                  Voir les prix
-                </button>
-              </form>
-            </div>
           </div>
         </div>
       </section>

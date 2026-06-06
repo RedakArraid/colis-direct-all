@@ -6,6 +6,7 @@ import { api, type Shipment } from '../lib/api';
 import ShipmentDetailsModal from '../components/shipment/ShipmentDetailsModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import PaystackInlinePayment from '../components/shipment/PaystackInlinePayment';
+import { resolvePaymentEmail } from '../utils/paymentEmail';
 import {
   isShipmentDelivered,
   normalizePaymentStatus,
@@ -336,7 +337,7 @@ function MyShipmentsPage({}: MyShipmentsPageProps = {}) {
         trackingNumber: shipment.tracking_number,
         amountFcfa: amount_fcfa,
         customerName: `${user.first_name} ${user.last_name}`.trim() || `${shipment.sender_first_name} ${shipment.sender_last_name}` || 'Client',
-        customerEmail: user.email || shipment.sender_email || 'paiement@colisdirect.com',
+        customerEmail: resolvePaymentEmail(user.email || shipment.sender_email),
         customerPhone: user.phone || shipment.sender_phone || '',
       });
     } finally {

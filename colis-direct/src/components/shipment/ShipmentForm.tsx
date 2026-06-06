@@ -6,6 +6,7 @@ import type { ShipmentFormData } from '../../pages/CreateShipmentPage';
 import { ALL_COMMUNE_NAMES } from '../../utils/ciLocations';
 import PhoneInput from '../PhoneInput';
 import CommuneSelect from '../CommuneSelect';
+import { isPaystackCompatibleEmail, sanitizeOptionalEmail } from '../../utils/paymentEmail';
 
 interface ShipmentFormProps {
   onSubmit: (data: ShipmentFormData) => void;
@@ -85,7 +86,7 @@ function ShipmentForm({ onSubmit, onSaveRecipient, onNavigate, initialData }: Sh
           ...prev,
           sender_first_name: user.first_name || '',
           sender_last_name: user.last_name || '',
-          sender_email: user.email || '',
+          sender_email: isPaystackCompatibleEmail(user.email || '') ? user.email!.trim() : '',
           sender_phone: user.phone || '',
           sender_commune: user.commune || '',
           sender_quartier: user.quartier || '',
@@ -237,7 +238,11 @@ function ShipmentForm({ onSubmit, onSaveRecipient, onNavigate, initialData }: Sh
       }
     }
 
-    onSubmit(formData);
+    onSubmit({
+      ...formData,
+      sender_email: sanitizeOptionalEmail(formData.sender_email) || '',
+      recipient_email: sanitizeOptionalEmail(formData.recipient_email) || '',
+    });
   };
 
   return (

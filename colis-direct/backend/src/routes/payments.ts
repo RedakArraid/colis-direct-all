@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { authenticate, AuthRequest, requireRole } from '../middleware/auth';
 import { pool } from '../db/connection';
 import dispatchService from '../services/dispatchService';
+import { resolvePaymentEmail } from '../utils/paymentEmail';
 const router = express.Router();
 export const paymentsWebhookRouter = express.Router();
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || '';
@@ -441,9 +442,7 @@ async function initPaystack(payload: InitPayload, res: express.Response, batch_r
     return res.status(503).json({ error: 'PAYSTACK_NOT_CONFIGURED — renseignez PAYSTACK_SECRET_KEY dans le .env' });
   }
 
-  const emailRegex = /^[a-zA-Z0-9._%\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
-  const trimmedEmail = (customer_email || '').trim();
-  const resolvedEmail = emailRegex.test(trimmedEmail) ? trimmedEmail : 'paiement@colisdirect.com';
+  const resolvedEmail = resolvePaymentEmail(customer_email);
 
 
   const reference = `PS-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -503,9 +502,7 @@ async function initCinetpay(payload: InitPayload, res: express.Response, batch_r
     return res.status(503).json({ error: 'CINETPAY_NOT_CONFIGURED — renseignez CINETPAY_API_KEY et CINETPAY_SITE_ID' });
   }
 
-  const emailRegexCp = /^[a-zA-Z0-9._%\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
-  const trimmedEmailCp = (customer_email || '').trim();
-  const resolvedEmailCp = emailRegexCp.test(trimmedEmailCp) ? trimmedEmailCp : 'paiement@colisdirect.com';
+  const resolvedEmailCp = resolvePaymentEmail(customer_email);
 
   const transactionId = `CP-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
   const cpPayload = {

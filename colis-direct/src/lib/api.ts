@@ -1,3 +1,5 @@
+import { resolvePaymentEmail } from '../utils/paymentEmail';
+
 export const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 class ApiClient {
@@ -1254,7 +1256,10 @@ class ApiClient {
   }) {
     return this.request<{ payment_url: string; transaction_id: string }>(
       '/payments/mobile-money/init',
-      { method: 'POST', body: JSON.stringify(payload) }
+      {
+        method: 'POST',
+        body: JSON.stringify({ ...payload, customer_email: resolvePaymentEmail(payload.customer_email) }),
+      }
     );
   }
 
@@ -1266,7 +1271,10 @@ class ApiClient {
   }) {
     return this.request<{ payment_url: string; transaction_id: string }>(
       '/payments/mobile-money/init-batch',
-      { method: 'POST', body: JSON.stringify(payload) }
+      {
+        method: 'POST',
+        body: JSON.stringify({ ...payload, customer_email: resolvePaymentEmail(payload.customer_email) }),
+      }
     );
   }
 
@@ -1279,7 +1287,10 @@ class ApiClient {
   }) {
     return this.request<{ payment_url: string; reference: string }>(
       '/payments/paystack/init',
-      { method: 'POST', body: JSON.stringify(payload) }
+      {
+        method: 'POST',
+        body: JSON.stringify({ ...payload, customer_email: resolvePaymentEmail(payload.customer_email) }),
+      }
     );
   }
 
@@ -1292,7 +1303,10 @@ class ApiClient {
   }) {
     return this.request<{ payment_url: string; transaction_id: string }>(
       '/payments/cinetpay/init',
-      { method: 'POST', body: JSON.stringify(payload) }
+      {
+        method: 'POST',
+        body: JSON.stringify({ ...payload, customer_email: resolvePaymentEmail(payload.customer_email) }),
+      }
     );
   }
 

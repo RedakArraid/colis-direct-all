@@ -12,6 +12,7 @@ import { useCart } from '../contexts/CartContext';
 import { api } from '../lib/api';
 import { usePricing } from '../hooks/usePricing';
 import { toast } from 'react-toastify';
+import { resolvePaymentEmail, sanitizeOptionalEmail } from '../utils/paymentEmail';
 
 type Step = 'auth-choice' | 'form' | 'delivery-mode' | 'relay' | 'summary' | 'automated-payment' | 'confirmation';
 
@@ -415,14 +416,14 @@ function CreateShipmentPage({ onNavigate }: CreateShipmentPageProps) {
                   const shipmentBase = {
                     sender_first_name: formData.sender_first_name,
                     sender_last_name: formData.sender_last_name,
-                    sender_email: formData.sender_email || null,
+                    sender_email: sanitizeOptionalEmail(formData.sender_email),
                     sender_phone: formData.sender_phone,
                     sender_commune: formData.sender_commune,
                     sender_quartier: formData.sender_quartier,
                     sender_address: formData.sender_address,
                     recipient_first_name: formData.recipient_first_name,
                     recipient_last_name: formData.recipient_last_name,
-                    recipient_email: formData.recipient_email || null,
+                    recipient_email: sanitizeOptionalEmail(formData.recipient_email),
                     recipient_phone: formData.recipient_phone,
                     recipient_commune: formData.recipient_commune,
                     recipient_quartier: formData.recipient_quartier,
@@ -478,7 +479,7 @@ function CreateShipmentPage({ onNavigate }: CreateShipmentPageProps) {
                       trackingNumber: finalTn,
                       amountFcfa: totalPrice,
                       customerName: `${formData.sender_first_name} ${formData.sender_last_name}`.trim(),
-                      customerEmail: formData.sender_email || user?.email || '',
+                      customerEmail: resolvePaymentEmail(formData.sender_email || user?.email),
                       customerPhone: formData.sender_phone,
                     });
                     setCurrentStep('automated-payment');
