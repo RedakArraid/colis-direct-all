@@ -1,13 +1,17 @@
 import { pool } from '../db/connection';
 
-const OFFER_DURATION_MINUTES = 3;
-const MAX_OFFER_ROUNDS = 5; // Nombre max de livreurs à contacter avant alerte admin
+/** Tour 1 : un seul livreur, délai court. Tours 2+ : broadcast parallèle. */
+const OFFER_DURATION_ROUND1_SECONDS = 60;
+const OFFER_DURATION_PARALLEL_SECONDS = 180;
+const PARALLEL_OFFER_COUNT = 3;
+const MAX_OFFER_ROUNDS = 5;
+
+type PickupCoords = { latitude: number; longitude: number };
 
 /**
  * Sélectionne les meilleurs livreurs disponibles pour un colis
- * et crée les offres de course en cascade.
+ * et crée les offres de course en cascade (tour 1) puis en parallèle (tours 2+).
  */
-/** Zone de dispatch : relais d'origine, ou commune expéditeur (home_pickup). */
 async function resolveDispatchZoneId(shipment: {
   origin_relay_id?: string | null;
   pickup_method?: string | null;
@@ -40,13 +44,49 @@ async function resolveDispatchZoneId(shipment: {
   return null;
 }
 
-async function dispatchShipment(shipmentId: string): Promise<void> {
-  const shipmentRes = await pool.query(
-    `SELECT s.*
-     FROM shipments s
-     WHERE s.id = $1`,
+/** Point de collecte : GPS expéditeur (home_pickup) ou coordonnées du relais d'origine. */
+async function resolvePickupCoords(shipment: {
+  sender_latitude?: number | string | null;
+  sender_longitude?: number | string | null;
+  origin_relay_id?: string | null;
+}): Promise<PickupCoords | null> {
+  const lat = Number(shipment.sender_latitude);
+  const lng = Number(shipment.sender_longitude);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    return { latitude: lat, longitude: lng };
+  }
+  if (shipment.origin_relay_id) {
+    const rp = await pool.query(
+      'SELECT latitude, longitude FROM relay_points WHERE id = $1',
+      [shipment.origin_relay_id]
+    );
+    const rLat = Number(rp.rows[0]?.latitude);
+    const rLng = Number(rp.rows[0]?.longitude);
+    if (Number.isFinite(rLat) && Number.isFinite(rLng)) {
+      return { latitude: rLat, longitude: rLng };
+    }
+  }
+  return null;
+}
+
+function offerDurationSeconds(round: number): number {
+  return round <= 1 ? OFFER_DURATION_ROUND1_SECONDS : OFFER_DURATION_PARALLEL_SECONDS;
+}
+
+function offerBatchSize(round: number): number {
+  return round <= 1 ? 1 : PARALLEL_OFFER_COUNT;
+}
+
+async function hasPendingOffers(shipmentId: string): Promise<boolean> {
+  const r = await pool.query(
+    `SELECT 1 FROM delivery_offers WHERE shipment_id = $1 AND status = 'pending' LIMIT 1`,
     [shipmentId]
   );
+  return r.rows.length > 0;
+}
+
+async function dispatchShipment(shipmentId: string): Promise<void> {
+  const shipmentRes = await pool.query(`SELECT s.* FROM shipments s WHERE s.id = $1`, [shipmentId]);
 
   if (shipmentRes.rows.length === 0) {
     throw new Error(`Colis ${shipmentId} introuvable`);
@@ -55,69 +95,82 @@ async function dispatchShipment(shipmentId: string): Promise<void> {
   const shipment = shipmentRes.rows[0];
   const originZoneId = await resolveDispatchZoneId(shipment);
 
-  // Vérifier qu'il n'y a pas déjà une offre active ou un livreur assigné
   const existingOfferRes = await pool.query(
     `SELECT id FROM delivery_offers WHERE shipment_id = $1 AND status = 'pending'`,
     [shipmentId]
   );
-  if (existingOfferRes.rows.length > 0) {
-    // Dispatch déjà en cours
-    return;
-  }
+  if (existingOfferRes.rows.length > 0) return;
 
-  if (shipment.transporter_id) {
-    // Livreur déjà assigné
-    return;
-  }
+  if (shipment.transporter_id) return;
 
   await continueDispatch(shipmentId, 1, originZoneId);
 }
 
 /**
- * Envoie la prochaine offre dans la cascade (round N)
+ * Envoie la prochaine vague d'offres (tour N).
+ * Tour 1 : 1 livreur / 60 s. Tours 2–5 : jusqu'à 3 livreurs en parallèle / 3 min.
  */
-async function continueDispatch(shipmentId: string, round: number, originZoneId?: string | null): Promise<void> {
+async function continueDispatch(
+  shipmentId: string,
+  round: number,
+  originZoneId?: string | null
+): Promise<void> {
   if (round > MAX_OFFER_ROUNDS) {
-    // Alerte admin : aucun livreur disponible
     await createAdminAlert(shipmentId);
     return;
   }
 
-  // Récupérer les livreurs déjà contactés pour ce colis
+  if (await hasPendingOffers(shipmentId)) return;
+
   const contactedRes = await pool.query(
     `SELECT transporter_id FROM delivery_offers WHERE shipment_id = $1`,
     [shipmentId]
   );
-  const alreadyContacted = contactedRes.rows.map((r: any) => r.transporter_id);
+  const alreadyContacted = contactedRes.rows.map((r: { transporter_id: string }) => r.transporter_id);
 
   const shipmentRes = await pool.query(`SELECT s.* FROM shipments s WHERE s.id = $1`, [shipmentId]);
-
   if (shipmentRes.rows.length === 0) return;
-  const shipment = shipmentRes.rows[0];
-  const zoneId = originZoneId ?? (await resolveDispatchZoneId(shipment));
 
-  // Trouver le meilleur livreur disponible non encore contacté
+  const shipment = shipmentRes.rows[0];
+  if (shipment.transporter_id) return;
+
+  const zoneId = originZoneId ?? (await resolveDispatchZoneId(shipment));
+  const pickup = await resolvePickupCoords(shipment);
+  const batchSize = offerBatchSize(round);
+
   const candidatesRes = await pool.query(
     `SELECT
         t.id,
         t.user_id,
         t.current_packages,
-        t.status,
-        -- Priorité zone : livreur dans la même zone que le relais d'origine
         CASE WHEN EXISTS (
           SELECT 1 FROM transporter_delivery_zones tdz
-          WHERE tdz.transporter_id = t.id AND tdz.zone_id = $1
+          WHERE tdz.transporter_id = t.id AND tdz.zone_id = $4
         ) THEN 1 ELSE 2 END AS zone_priority,
-        -- Score charge : moins de colis = meilleur
-        COALESCE(t.current_packages, 0) AS load_score
+        COALESCE(t.current_packages, 0) AS load_score,
+        CASE
+          WHEN $1::double precision IS NOT NULL AND $2::double precision IS NOT NULL
+               AND t.current_latitude IS NOT NULL AND t.current_longitude IS NOT NULL
+          THEN (
+            6371 * acos(LEAST(1.0, GREATEST(-1.0,
+              cos(radians($1::double precision)) * cos(radians(t.current_latitude))
+              * cos(radians(t.current_longitude) - radians($2::double precision))
+              + sin(radians($1::double precision)) * sin(radians(t.current_latitude))
+            )))
+          )
+          ELSE NULL
+        END AS distance_km
      FROM transporters t
      WHERE t.status = 'available'
-       AND t.id != ALL($2::uuid[])
-     ORDER BY zone_priority ASC, load_score ASC, t.updated_at ASC
-     LIMIT 1`,
+       AND t.id != ALL($3::uuid[])
+     ORDER BY zone_priority ASC, distance_km ASC NULLS LAST, load_score ASC, t.updated_at ASC
+     LIMIT $5`,
     [
-      zoneId || null,
+      pickup?.latitude ?? null,
+      pickup?.longitude ?? null,
       alreadyContacted.length > 0 ? alreadyContacted : ['00000000-0000-0000-0000-000000000000'],
+      zoneId || null,
+      batchSize,
     ]
   );
 
@@ -126,31 +179,41 @@ async function continueDispatch(shipmentId: string, round: number, originZoneId?
     return;
   }
 
-  const candidate = candidatesRes.rows[0];
-
-  // Calculer les gains nets du livreur
   const commissionRes = await pool.query(
     `SELECT rate_percent FROM commission_settings WHERE is_active = true ORDER BY effective_from DESC LIMIT 1`
   );
   const commissionRate = parseFloat(commissionRes.rows[0]?.rate_percent || '20');
   const netEarnings = parseFloat(shipment.price || '0') * (1 - commissionRate / 100);
+  const netRounded = Math.round(netEarnings);
 
-  const expiresAt = new Date(Date.now() + OFFER_DURATION_MINUTES * 60 * 1000);
+  const expiresAt = new Date(Date.now() + offerDurationSeconds(round) * 1000);
 
-  await pool.query(
-    `INSERT INTO delivery_offers
-       (shipment_id, transporter_id, expires_at, offer_round, net_earnings_fcfa)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [shipmentId, candidate.id, expiresAt, round, Math.round(netEarnings)]
-  );
+  for (const candidate of candidatesRes.rows) {
+    await pool.query(
+      `INSERT INTO delivery_offers
+         (shipment_id, transporter_id, expires_at, offer_round, net_earnings_fcfa)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (shipment_id, transporter_id, offer_round) DO NOTHING`,
+      [shipmentId, candidate.id, expiresAt, round, netRounded]
+    );
 
-  // Notifier le livreur (via la table notifications)
-  await notifyTransporter(candidate.user_id, shipmentId, Math.round(netEarnings));
+    const distanceKm =
+      candidate.distance_km != null && Number.isFinite(Number(candidate.distance_km))
+        ? Math.round(Number(candidate.distance_km) * 10) / 10
+        : null;
+
+    await notifyTransporter(candidate.user_id, shipmentId, netRounded, {
+      round,
+      parallel: batchSize > 1,
+      expiresInSeconds: offerDurationSeconds(round),
+      distanceKm,
+    });
+  }
 }
 
 /**
- * Traiter les offres expirées et déclencher la cascade
- * Appelé par un cron job toutes les minutes
+ * Traiter les offres expirées et déclencher la cascade suivante.
+ * N'avance pas tant qu'il reste des offres pending sur le même colis.
  */
 async function processExpiredOffers(): Promise<void> {
   const expiredRes = await pool.query(
@@ -160,33 +223,29 @@ async function processExpiredOffers(): Promise<void> {
      RETURNING shipment_id, offer_round`
   );
 
+  const processed = new Set<string>();
+
   for (const expired of expiredRes.rows) {
-    // Vérifier que le colis n'a pas déjà été assigné entre-temps
-    const shipmentCheck = await pool.query(
-      `SELECT transporter_id FROM shipments WHERE id = $1`,
-      [expired.shipment_id]
-    );
+    const sid = String(expired.shipment_id);
+    if (processed.has(sid)) continue;
+    processed.add(sid);
+
+    if (await hasPendingOffers(sid)) continue;
+
+    const shipmentCheck = await pool.query(`SELECT transporter_id FROM shipments WHERE id = $1`, [sid]);
     if (shipmentCheck.rows[0]?.transporter_id) continue;
 
-    // Continuer la cascade vers le prochain livreur
-    continueDispatch(expired.shipment_id, expired.offer_round + 1, undefined).catch((err) =>
+    continueDispatch(sid, Number(expired.offer_round) + 1, undefined).catch((err) =>
       console.error('Continue dispatch error:', err)
     );
   }
 }
 
-/**
- * Créditer le portefeuille du livreur après livraison confirmée
- */
-async function creditTransporterWallet(
-  shipmentId: string,
-  transporterId: string
-): Promise<void> {
+async function creditTransporterWallet(shipmentId: string, transporterId: string): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    // Éviter double crédit
     const existingCredit = await client.query(
       `SELECT id FROM wallet_transactions
        WHERE shipment_id = $1 AND transporter_id = $2 AND type = 'commission_earned'`,
@@ -197,10 +256,7 @@ async function creditTransporterWallet(
       return;
     }
 
-    const shipmentRes = await client.query(
-      `SELECT price FROM shipments WHERE id = $1`,
-      [shipmentId]
-    );
+    const shipmentRes = await client.query(`SELECT price FROM shipments WHERE id = $1`, [shipmentId]);
     if (shipmentRes.rows.length === 0) {
       await client.query('ROLLBACK');
       return;
@@ -215,7 +271,6 @@ async function creditTransporterWallet(
     const colisdirectFee = Math.round(grossAmount * (commissionRate / 100));
     const netAmount = grossAmount - colisdirectFee;
 
-    // Insérer la transaction
     await client.query(
       `INSERT INTO wallet_transactions
          (transporter_id, shipment_id, type, amount_fcfa, commission_rate_percent,
@@ -224,7 +279,6 @@ async function creditTransporterWallet(
       [transporterId, shipmentId, netAmount, commissionRate, grossAmount, colisdirectFee]
     );
 
-    // Mettre à jour le portefeuille
     await client.query(
       `INSERT INTO transporter_wallets (transporter_id, balance_fcfa, total_earned_fcfa)
        VALUES ($1, $2, $2)
@@ -244,16 +298,18 @@ async function creditTransporterWallet(
   }
 }
 
-/**
- * Créer une notification pour un livreur
- */
 async function notifyTransporter(
   userId: string,
   shipmentId: string,
-  netEarnings: number
+  netEarnings: number,
+  meta: {
+    round: number;
+    parallel: boolean;
+    expiresInSeconds: number;
+    distanceKm: number | null;
+  }
 ): Promise<void> {
   try {
-    // Vérifier que la table notifications existe
     const tableCheck = await pool.query(`
       SELECT EXISTS (
         SELECT FROM information_schema.tables
@@ -262,25 +318,33 @@ async function notifyTransporter(
     `);
     if (!tableCheck.rows[0]?.exists) return;
 
+    const mins = Math.max(1, Math.round(meta.expiresInSeconds / 60));
+    const distPart =
+      meta.distanceKm != null ? ` · ~${meta.distanceKm} km` : '';
+    const parallelPart = meta.parallel ? ' (offre groupée)' : '';
+
     await pool.query(
       `INSERT INTO notifications (user_id, title, message, type, data)
-       VALUES ($1, $2, $3, 'new_delivery_offer', $4::jsonb)
-       ON CONFLICT DO NOTHING`,
+       VALUES ($1, $2, $3, 'new_delivery_offer', $4::jsonb)`,
       [
         userId,
         '🚀 Nouvelle course disponible !',
-        `Gains estimés : ${netEarnings.toLocaleString()} FCFA. Acceptez dans 3 minutes.`,
-        JSON.stringify({ shipment_id: shipmentId, net_earnings_fcfa: netEarnings }),
+        `Gains estimés : ${netEarnings.toLocaleString('fr-FR')} FCFA${distPart}. Acceptez sous ${mins} min${parallelPart}.`,
+        JSON.stringify({
+          shipment_id: shipmentId,
+          net_earnings_fcfa: netEarnings,
+          offer_round: meta.round,
+          parallel: meta.parallel,
+          expires_in_seconds: meta.expiresInSeconds,
+          distance_km: meta.distanceKm,
+        }),
       ]
     );
   } catch {
-    // Notifications non critiques, on ne bloque pas le dispatch
+    // Notifications non critiques
   }
 }
 
-/**
- * Créer une alerte admin quand aucun livreur ne peut prendre le colis
- */
 async function createAdminAlert(shipmentId: string): Promise<void> {
   try {
     const tableCheck = await pool.query(`
@@ -291,7 +355,6 @@ async function createAdminAlert(shipmentId: string): Promise<void> {
     `);
     if (!tableCheck.rows[0]?.exists) return;
 
-    // Notifier tous les admins
     const adminRes = await pool.query(`SELECT id FROM users WHERE role = 'admin'`);
     for (const admin of adminRes.rows) {
       await pool.query(
@@ -315,4 +378,5 @@ export default {
   continueDispatch,
   processExpiredOffers,
   creditTransporterWallet,
+  hasPendingOffers,
 };

@@ -401,14 +401,14 @@ async function startServer() {
       console.log(`🚀 Server running on port ${PORT}`);
 
       // ─── Cron job: traitement des offres de course expirées ───────────────
-      // Toutes les 60 secondes : cascade vers le livreur suivant si l'offre a expiré
+      // Toutes les 30 secondes : respecte le délai 60 s du tour 1 et les offres parallèles
       setInterval(() => {
         dispatchService.processExpiredOffers().catch((err) => {
           console.error('Dispatch cron error:', err);
         });
-      }, 60 * 1000);
+      }, 30 * 1000);
 
-      console.log('⏱  Dispatch cron démarré (interval: 60s)');
+      console.log('⏱  Dispatch cron démarré (interval: 30s)');
 
       // ─── Cron job: dispatch par lots (batch) ─────────────────────────────
       // Tick toutes les 60s, mais respecte cronIntervalMinutes de la config

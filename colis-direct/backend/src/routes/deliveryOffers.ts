@@ -42,9 +42,28 @@ router.get('/my-offers', authenticate, requireRole('transporter'), async (req: A
           rp_origin.commune AS origin_relay_commune,
           rp_dest.name    AS destination_relay_name,
           rp_dest.address AS destination_relay_address,
-          rp_dest.commune AS destination_relay_commune
+          rp_dest.commune AS destination_relay_commune,
+          CASE
+            WHEN COALESCE(s.sender_latitude, rp_origin.latitude) IS NOT NULL
+                 AND COALESCE(s.sender_longitude, rp_origin.longitude) IS NOT NULL
+                 AND t.current_latitude IS NOT NULL AND t.current_longitude IS NOT NULL
+            THEN ROUND((
+              6371 * acos(LEAST(1.0, GREATEST(-1.0,
+                cos(radians(COALESCE(s.sender_latitude, rp_origin.latitude)::double precision))
+                * cos(radians(t.current_latitude))
+                * cos(radians(t.current_longitude) - radians(COALESCE(s.sender_longitude, rp_origin.longitude)::double precision))
+                + sin(radians(COALESCE(s.sender_latitude, rp_origin.latitude)::double precision))
+                * sin(radians(t.current_latitude))
+              )))
+            )::numeric, 1)
+            ELSE NULL
+          END AS distance_km,
+          (SELECT COUNT(*)::int FROM delivery_offers o2
+           WHERE o2.shipment_id = o.shipment_id AND o2.status = 'pending' AND o2.offer_round = o.offer_round
+          ) AS parallel_offers_count
        FROM delivery_offers o
        JOIN shipments s ON s.id = o.shipment_id
+       JOIN transporters t ON t.id = o.transporter_id
        LEFT JOIN relay_points rp_origin ON rp_origin.id = s.origin_relay_id
        LEFT JOIN relay_points rp_dest   ON rp_dest.id   = s.destination_relay_id
        WHERE o.transporter_id = $1 AND o.status = 'pending'
@@ -174,14 +193,20 @@ router.post('/:offerId/decline', authenticate, requireRole('transporter'), async
       return res.status(404).json({ error: "Offre non trouvée ou plus disponible" });
     }
 
+    const offer = offerRes.rows[0];
+
     await pool.query(
       `UPDATE delivery_offers SET status = 'declined', responded_at = NOW() WHERE id = $1`,
       [offerId]
     );
 
-    // Déclencher le dispatch vers le prochain livreur (non-bloquant)
-    dispatchService.continueDispatch(offerRes.rows[0].shipment_id, offerRes.rows[0].offer_round + 1)
-      .catch((err) => console.error('Continue dispatch error:', err));
+    // Cascade uniquement s'il ne reste plus d'offres pending sur ce colis (parallèle ou non)
+    const stillPending = await dispatchService.hasPendingOffers(offer.shipment_id);
+    if (!stillPending) {
+      dispatchService
+        .continueDispatch(offer.shipment_id, offer.offer_round + 1)
+        .catch((err) => console.error('Continue dispatch error:', err));
+    }
 
     res.json({ success: true, message: 'Course déclinée' });
   } catch (error: any) {

@@ -779,6 +779,7 @@ class ApiClient {
       state: 'not_applicable' | 'searching' | 'assigned' | 'no_driver';
       pickup?: { latitude: number | null; longitude: number | null };
       offers_sent?: number;
+      pending_offers?: number;
       round?: number;
       driver?: {
         first_name: string;

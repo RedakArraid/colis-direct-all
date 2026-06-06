@@ -162,7 +162,13 @@ router.get('/:trackingNumber/dispatch-status', async (req, res) => {
     );
     const o = offersRes.rows[0];
     if (o.total > 0) {
-      return res.json({ state: 'searching', pickup, offers_sent: o.total, round: o.last_round });
+      return res.json({
+        state: 'searching',
+        pickup,
+        offers_sent: o.total,
+        pending_offers: o.pending,
+        round: o.last_round,
+      });
     }
     return res.json({
       state: s.payment_status === 'paid' ? 'no_driver' : 'searching',

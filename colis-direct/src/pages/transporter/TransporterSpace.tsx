@@ -631,6 +631,44 @@ export default function TransporterSpace() {
     if (isTransporter) loadCore();
   }, [isTransporter, loadCore]);
 
+  // Rafraîchissement des offres (style push in-app) + position GPS pour le scoring dispatch
+  useEffect(() => {
+    if (!isTransporter || !isOnline) return;
+
+    const pollOffers = window.setInterval(() => {
+      api.getMyOffers().then(({ data }) => {
+        if (!Array.isArray(data)) return;
+        setOffers((prev) => {
+          const prevIds = new Set(prev.map((o) => o.id));
+          const added = data.filter((o: { id: string }) => !prevIds.has(o.id));
+          if (added.length > 0 && pushNotifications) {
+            toast.info(`🚀 ${added.length} nouvelle(s) course(s) disponible(s)`);
+          }
+          return data;
+        });
+      }).catch(() => {});
+    }, 20_000);
+
+    let geoWatch: number | null = null;
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      geoWatch = navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          api.updateMyLocation(latitude, longitude).catch(() => {});
+        },
+        () => {},
+        { enableHighAccuracy: false, maximumAge: 60_000, timeout: 15_000 }
+      );
+    }
+
+    return () => {
+      window.clearInterval(pollOffers);
+      if (geoWatch != null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(geoWatch);
+      }
+    };
+  }, [isTransporter, isOnline, pushNotifications]);
+
   // Lazy load Leaflet dynamically
   useEffect(() => {
     let mounted = true;
@@ -1210,7 +1248,11 @@ export default function TransporterSpace() {
                         </span>
                       )}
                       <div style={{ fontWeight: 800, fontSize: 15, color: CD.ink }}>{pickupLabelOf(r)}</div>
-                      <div style={{ fontSize: 11, color: CD.muted, margin: '6px 0', fontWeight: 600 }}>{r.package_type || 'Colis'} · {r.weight || '?'} kg</div>
+                      <div style={{ fontSize: 11, color: CD.muted, margin: '6px 0', fontWeight: 600 }}>
+                        {r.package_type || 'Colis'} · {r.weight || '?'} kg
+                        {r.distance_km != null ? ` · ~${r.distance_km} km` : ''}
+                        {r.parallel_offers_count > 1 ? ` · ${r.parallel_offers_count} livreurs contactés` : ''}
+                      </div>
                       <div style={{ fontWeight: 800, fontSize: 15, color: CD.ink }}>{destLabelOf(r)}</div>
                     </div>
                   </div>
