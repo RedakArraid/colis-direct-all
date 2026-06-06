@@ -12,7 +12,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -37,11 +36,6 @@ fun TransporterHomeScreen(
     viewModel: TransporterViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
-
-    LaunchedEffect(Unit) {
-        viewModel.loadAssignments()
-        viewModel.loadDeliveredShipments()
-    }
 
     Column(
         modifier = Modifier
@@ -163,11 +157,11 @@ fun TransporterHomeScreen(
                             .background(OrangeLight),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Edit, null, tint = OrangePrimary)
+                        Icon(Icons.Default.QrCodeScanner, null, tint = OrangePrimary)
                     }
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Saisir un colis", fontFamily = InterFontFamily, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Gray900)
-                        Text("N° de suivi — ramassage ou dépôt", fontFamily = InterFontFamily, fontSize = 12.sp, color = Gray500)
+                        Text("Scanner un colis", fontFamily = InterFontFamily, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Gray900)
+                        Text("Enregistrer un ramassage ou dépôt", fontFamily = InterFontFamily, fontSize = 12.sp, color = Gray500)
                     }
                     Icon(Icons.Default.ChevronRight, null, tint = Gray300)
                 }

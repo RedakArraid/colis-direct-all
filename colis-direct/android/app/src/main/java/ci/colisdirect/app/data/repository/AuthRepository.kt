@@ -4,6 +4,7 @@ import ci.colisdirect.app.data.api.ApiService
 import ci.colisdirect.app.data.api.model.AuthResponse
 import ci.colisdirect.app.data.api.model.SignInRequest
 import ci.colisdirect.app.data.api.model.SignUpRequest
+import ci.colisdirect.app.data.api.model.UpdateUserRequest
 import ci.colisdirect.app.data.api.model.UserDto
 import ci.colisdirect.app.data.local.TokenManager
 import kotlinx.coroutines.Dispatchers
@@ -87,6 +88,32 @@ class AuthRepository @Inject constructor(
             AuthResult.Error("Erreur de connexion : ${e.localizedMessage}")
         }
     }
+
+    suspend fun updateUser(userId: String, request: UpdateUserRequest): AuthResult<UserDto> =
+        withContext(Dispatchers.IO) {
+            try {
+                val response = api.updateUser(userId, request)
+                if (response.isSuccessful) {
+                    val user = response.body()!!
+                    tokenManager.saveUserInfo(
+                        userId = user.id,
+                        email = user.email,
+                        role = user.role,
+                        firstName = user.firstName,
+                        lastName = user.lastName,
+                        relayPointId = user.relayPointId,
+                    )
+                    AuthResult.Success(user)
+                } else {
+                    val errorMsg = response.errorBody()?.string()
+                        ?.let { parseErrorMessage(it) }
+                        ?: "Impossible de mettre à jour le profil"
+                    AuthResult.Error(errorMsg)
+                }
+            } catch (e: Exception) {
+                AuthResult.Error(e.localizedMessage ?: "Erreur réseau")
+            }
+        }
 
     suspend fun getMe(): AuthResult<UserDto> = withContext(Dispatchers.IO) {
         try {

@@ -70,7 +70,7 @@ final class ClientViewModel: ObservableObject {
         isLoading = true
         error = nil
         do {
-            let amount = shipment.price ?? 0.0
+            let amount = (shipment.price ?? 0.0) + (shipment.printingFee ?? 0.0) + (shipment.assistanceFee ?? 0.0) + (shipment.boxPrice ?? 0.0)
             let name = shipment.senderName ?? user?.fullName ?? "Client ColisDirect"
             let email = user?.email ?? "paiement@colisdirect.com"
             let phone = shipment.senderPhone ?? user?.phone ?? ""
@@ -167,7 +167,7 @@ final class RelayPointsViewModel: ObservableObject {
 final class PricingViewModel: ObservableObject {
     @Published var senderCommune = ""
     @Published var recipientCommune = ""
-    @Published var packageSize = "medium"
+    @Published var packageSize = "moyen"
     @Published var weight = 1.0
     @Published var result: PricingCalculateResponse? = nil
     @Published var isLoading = false

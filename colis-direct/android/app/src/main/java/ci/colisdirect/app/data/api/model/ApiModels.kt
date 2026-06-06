@@ -42,6 +42,16 @@ data class MeResponse(
     val user: UserDto
 )
 
+data class UpdateUserRequest(
+    @SerializedName("first_name") val firstName: String? = null,
+    @SerializedName("last_name") val lastName: String? = null,
+    val phone: String? = null,
+    val commune: String? = null,
+    val quartier: String? = null,
+    val ville: String? = null,
+    val address: String? = null,
+)
+
 // ===================== SHIPMENTS =====================
 
 data class ShipmentDto(
@@ -158,6 +168,19 @@ data class CreateShipmentRequest(
     @SerializedName("destination_relay_id") val destinationRelayId: String?,
     @SerializedName("print_at_relay") val printAtRelay: Boolean = false,
     @SerializedName("relay_assisted") val relayAssisted: Boolean = false,
+    @SerializedName("promo_code") val promoCode: String? = null,
+)
+
+data class PromoValidateRequest(val code: String)
+
+data class PromoValidateResponse(
+    val code: String,
+    @SerializedName("discount_type") val discountType: String,
+    @SerializedName("discount_value") val discountValue: Double,
+)
+
+data class PromoValidateEnvelope(
+    val data: PromoValidateResponse?,
 )
 
 // ===================== RELAY POINTS =====================

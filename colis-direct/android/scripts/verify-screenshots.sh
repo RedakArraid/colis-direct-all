@@ -38,12 +38,11 @@ sleep 1
 tap 980 120 && sleep 1.5 && shot "06_notifications.png"
 back
 
-# Tarifs (scroll + bouton — zone CTA ~ y=1600)
+# Services rapides (accueil)
 tap "$TAB_HOME" "$TAB_Y"
-adb -s "$DEVICE" shell input swipe 540 1800 540 800 400
+adb -s "$DEVICE" shell input swipe 540 1200 540 600 400
 sleep 0.8
-tap 540 1750 && sleep 1.5 && shot "07_tarifs.png"
-back
+shot "07_services_rapides.png"
 
 # Partenaire
 tap "$TAB_HOME" "$TAB_Y"

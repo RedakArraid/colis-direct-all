@@ -27,6 +27,9 @@ import ci.colisdirect.app.data.api.model.ShipmentDto
 import ci.colisdirect.app.domain.CreateShipmentValidation
 import ci.colisdirect.app.domain.DeliveryModeCard
 import ci.colisdirect.app.domain.PricingHelper
+import ci.colisdirect.app.domain.PromoDiscount
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import ci.colisdirect.app.domain.formatFcfa
 import ci.colisdirect.app.ui.components.CommuneDropdown
 import ci.colisdirect.app.ui.theme.Gray900
@@ -34,6 +37,7 @@ import ci.colisdirect.app.ui.theme.InterFontFamily
 import ci.colisdirect.app.ui.theme.OrangePrimary
 import ci.colisdirect.app.viewmodel.AuthViewModel
 import ci.colisdirect.app.ui.navigation.appClientViewModel
+import ci.colisdirect.app.data.repository.ApiResult
 import ci.colisdirect.app.viewmodel.ClientViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -80,6 +84,11 @@ fun CreateShipmentScreen(
     var originRelayId by remember { mutableStateOf<String?>(null) }
     var destinationRelayId by remember { mutableStateOf<String?>(null) }
     var saveRecipientToBook by remember { mutableStateOf(false) }
+    var promoInput by remember { mutableStateOf("") }
+    var promoValidated by remember { mutableStateOf<PromoDiscount.Validated?>(null) }
+    var promoError by remember { mutableStateOf<String?>(null) }
+    var promoLoading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     val isLoggedIn = authState.isLoggedIn && authState.user != null
     val steps = listOf("Informations", "Mode", "Relais", "Récap")
@@ -123,6 +132,8 @@ fun CreateShipmentScreen(
         senderCommune, recipientCommune, gridType, packageType, weightVal,
         pickupMethod, homeDelivery, isFragile, isInsured,
     )
+    val effectivePrice = PromoDiscount.effectiveTotalFcfa(displayPrice, promoValidated)
+    val promoDiscountFcfa = PromoDiscount.discountFcfa(displayPrice, promoValidated)
 
     Scaffold(
         topBar = {
@@ -271,8 +282,38 @@ fun CreateShipmentScreen(
                             gridType = gridType,
                             packageType = packageType,
                             priceFcfa = displayPrice,
+                            discountFcfa = promoDiscountFcfa,
+                            effectivePriceFcfa = effectivePrice,
                             paymentMethod = paymentMethod,
                             onPaymentMethodChange = { paymentMethod = it },
+                            promoInput = promoInput,
+                            onPromoInputChange = {
+                                promoInput = it
+                                promoValidated = null
+                                promoError = null
+                            },
+                            promoError = promoError,
+                            promoLoading = promoLoading,
+                            promoValidated = promoValidated,
+                            onValidatePromo = {
+                                val code = promoInput.trim()
+                                if (code.isEmpty()) return@SummaryStep
+                                promoLoading = true
+                                promoError = null
+                                scope.launch {
+                                    when (val r = viewModel.validatePromoCode(code)) {
+                                        is ApiResult.Success -> {
+                                            promoValidated = r.data
+                                            promoError = null
+                                        }
+                                        is ApiResult.Error -> {
+                                            promoValidated = null
+                                            promoError = r.message
+                                        }
+                                    }
+                                    promoLoading = false
+                                }
+                            },
                         )
                         else -> Unit
                     }
@@ -346,15 +387,17 @@ fun CreateShipmentScreen(
                                 homeDelivery = homeDelivery,
                                 originRelayId = if (pickupMethod == "relay_deposit") originRelayId else null,
                                 destinationRelayId = if (!homeDelivery) destinationRelayId else null,
+                                promoCode = promoValidated?.code,
                             )
                             viewModel.createShipment(request, saveRecipientToBook = saveRecipientToBook) { shipment ->
-                                when (paymentMethod) {
-                                    "relay_cash" -> onNavigateToCheckout(shipment.trackingNumber, true)
+                                when {
+                                    paymentMethod == "relay_cash" || effectivePrice == 0 ->
+                                        onNavigateToCheckout(shipment.trackingNumber, true)
                                     else -> {
                                         val routeLabel = "${senderCommune}_to_${recipientCommune}"
                                         onNavigateToPayment(
                                             shipment.trackingNumber,
-                                            displayPrice,
+                                            effectivePrice.coerceAtLeast(1),
                                             routeLabel,
                                         )
                                     }
@@ -652,7 +695,15 @@ private fun SummaryStep(
     gridType: String,
     packageType: String,
     priceFcfa: Int,
+    discountFcfa: Int,
+    effectivePriceFcfa: Int,
     onPaymentMethodChange: (String) -> Unit,
+    promoInput: String,
+    onPromoInputChange: (String) -> Unit,
+    promoError: String?,
+    promoLoading: Boolean,
+    promoValidated: PromoDiscount.Validated?,
+    onValidatePromo: () -> Unit,
 ) {
     Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -669,7 +720,48 @@ private fun SummaryStep(
                 style = MaterialTheme.typography.bodyMedium,
             )
             HorizontalDivider()
-            Text(formatFcfa(priceFcfa), fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = OrangePrimary)
+            if (discountFcfa > 0) {
+                Text("Sous-total : ${formatFcfa(priceFcfa)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "Code ${promoValidated?.code ?: ""} : -${formatFcfa(discountFcfa)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF10B981),
+                )
+            }
+            Text(formatFcfa(effectivePriceFcfa), fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = OrangePrimary)
+        }
+    }
+    var promoOpen by remember { mutableStateOf(false) }
+    TextButton(onClick = { promoOpen = !promoOpen }) {
+        Text(if (promoOpen) "Masquer le code promo" else "J'ai un code promo")
+    }
+    if (promoOpen) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = promoInput,
+                onValueChange = onPromoInputChange,
+                label = { Text("Code promo") },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+            )
+            Button(
+                onClick = onValidatePromo,
+                enabled = !promoLoading && promoInput.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary),
+            ) {
+                if (promoLoading) {
+                    CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                } else {
+                    Text("OK")
+                }
+            }
+        }
+        promoError?.let {
+            Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+        }
+        promoValidated?.let {
+            Text("Code « ${it.code} » appliqué", color = Color(0xFF10B981), fontSize = 12.sp)
         }
     }
     Text("Paiement", style = MaterialTheme.typography.labelMedium)

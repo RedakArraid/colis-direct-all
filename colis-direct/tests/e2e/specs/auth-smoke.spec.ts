@@ -19,10 +19,12 @@ test.describe('Connexions par role staging', () => {
       test.skip(!credentials, `Renseigner E2E_${envRole.toUpperCase()}_EMAIL et E2E_${envRole.toUpperCase()}_PASSWORD.`);
 
       const diagnostics = collectBrowserDiagnostics(page);
-      await loginWithEmail(page, credentials!, {
-        id: getRoleUserId(envRole),
-        role: appRole,
-      });
+      const authMode = process.env.E2E_AUTH_MODE || 'api';
+      const identity =
+        authMode === 'jwt'
+          ? { id: getRoleUserId(envRole), role: appRole }
+          : undefined;
+      await loginWithEmail(page, credentials!, identity);
 
       const currentUser = await page.evaluate(async (apiURL) => {
         const token = window.localStorage.getItem('auth_token');

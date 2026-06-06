@@ -41,10 +41,12 @@ object ProfileVisibility {
     }
 
     enum class ClientProfileItem {
+        EDIT_PROFILE,
         ADDRESS_BOOK,
         PAYMENT_HISTORY,
-        PRICING,
+        PAYMENT_METHODS,
         PARTNER,
+        SETTINGS,
         LEGAL,
         SUPPORT,
     }

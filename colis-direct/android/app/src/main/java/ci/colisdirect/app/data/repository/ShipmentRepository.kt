@@ -2,6 +2,7 @@ package ci.colisdirect.app.data.repository
 
 import ci.colisdirect.app.data.api.ApiService
 import ci.colisdirect.app.data.api.model.*
+import ci.colisdirect.app.domain.PromoDiscount
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -47,6 +48,26 @@ class ShipmentRepository @Inject constructor(
                 val response = api.createShipment(request)
                 if (response.isSuccessful) ApiResult.Success(response.body()!!)
                 else ApiResult.Error(response.parseError())
+            }.getOrElse { ApiResult.Error(it.localizedMessage ?: "Erreur réseau") }
+        }
+
+    suspend fun validatePromoCode(code: String): ApiResult<PromoDiscount.Validated> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val response = api.validatePromoCode(PromoValidateRequest(code.trim()))
+                if (response.isSuccessful) {
+                    val body = response.body()?.data
+                        ?: return@runCatching ApiResult.Error("Réponse promo invalide")
+                    ApiResult.Success(
+                        PromoDiscount.Validated(
+                            code = body.code,
+                            discountType = body.discountType,
+                            discountValue = body.discountValue,
+                        ),
+                    )
+                } else {
+                    ApiResult.Error(response.parseError())
+                }
             }.getOrElse { ApiResult.Error(it.localizedMessage ?: "Erreur réseau") }
         }
 

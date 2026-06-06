@@ -12,7 +12,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -37,11 +36,6 @@ fun RelayHomeScreen(
     viewModel: RelayViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
-    val stats = state.stats
-
-    LaunchedEffect(Unit) {
-        viewModel.loadDashboard()
-    }
 
     Column(
         modifier = Modifier
@@ -114,7 +108,7 @@ fun RelayHomeScreen(
         ) {
             RelayMetricCard(
                 label = "À recevoir",
-                count = stats?.pendingPickups ?: state.pendingIntake.size,
+                count = state.pendingIntake.size,
                 icon = Icons.Default.Inbox,
                 modifier = Modifier.weight(1f),
                 onClick = { onNavigateToTab(1) } // Mes Colis tab is index 1
@@ -127,21 +121,12 @@ fun RelayHomeScreen(
                 onClick = { onNavigateToTab(1) }
             )
             RelayMetricCard(
-                label = "À livrer",
-                count = stats?.pendingDeliveries ?: state.awaitingPickup.size,
+                label = "À remettre",
+                count = state.awaitingPickup.size,
                 icon = Icons.Default.PersonPin,
                 highlight = state.awaitingPickup.isNotEmpty(),
                 modifier = Modifier.weight(1f),
                 onClick = { onNavigateToTab(1) }
-            )
-        }
-
-        if ((stats?.completedToday ?: 0) > 0 || (stats?.monthlyRevenue ?: 0.0) > 0) {
-            Text(
-                "${stats?.completedToday ?: 0} colis traités aujourd'hui",
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
-                fontSize = 13.sp,
-                color = Gray600,
             )
         }
 
@@ -179,11 +164,11 @@ fun RelayHomeScreen(
                             .background(OrangeLight),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Edit, null, tint = OrangePrimary)
+                        Icon(Icons.Default.QrCodeScanner, null, tint = OrangePrimary)
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Réceptionner un colis", fontFamily = InterFontFamily, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Gray900)
-                        Text("Saisir le n° de suivi à l'arrivée", fontFamily = InterFontFamily, fontSize = 12.sp, color = Gray500)
+                        Text("Scanner le code barre à l'arrivée", fontFamily = InterFontFamily, fontSize = 12.sp, color = Gray500)
                     }
                     Icon(Icons.Default.ChevronRight, null, tint = Gray300)
                 }

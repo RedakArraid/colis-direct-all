@@ -27,7 +27,7 @@ export async function navigateWithHeader(page: Page, label: RegExp | string) {
 export async function loginAs(page: Page, email: string, password: string) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   // Cliquer sur le bouton Connexion dans la navbar
-  await page.getByRole('navigation').getByRole('button', { name: /Connexion/i }).first().click();
+  await page.getByRole('button', { name: /Se connecter/i }).first().click();
   await page.getByLabel(/E-mail|email/i).fill(email);
   await page.getByLabel(/Mot de passe|password/i).fill(password);
   await page.getByRole('button', { name: /Se connecter/i }).click();

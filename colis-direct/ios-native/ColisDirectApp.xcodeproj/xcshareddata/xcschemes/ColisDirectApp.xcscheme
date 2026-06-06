@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "665FE1228F564D37A9E259EB"
+               BlueprintIdentifier = "0D9E2E14459F439FBBDAF815"
                BuildableName = "ColisDirectApp.app"
                BlueprintName = "ColisDirectApp"
                ReferencedContainer = "container:ColisDirectApp.xcodeproj">
@@ -43,7 +43,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "665FE1228F564D37A9E259EB"
+            BlueprintIdentifier = "0D9E2E14459F439FBBDAF815"
             BuildableName = "ColisDirectApp.app"
             BlueprintName = "ColisDirectApp"
             ReferencedContainer = "container:ColisDirectApp.xcodeproj">
@@ -60,7 +60,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "665FE1228F564D37A9E259EB"
+            BlueprintIdentifier = "0D9E2E14459F439FBBDAF815"
             BuildableName = "ColisDirectApp.app"
             BlueprintName = "ColisDirectApp"
             ReferencedContainer = "container:ColisDirectApp.xcodeproj">

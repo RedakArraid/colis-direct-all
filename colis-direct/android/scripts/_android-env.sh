@@ -1,7 +1,16 @@
 # shellcheck shell=bash
 # À sourcer : exporte JAVA_HOME, ANDROID_HOME et PATH (adb, emulator).
-if [ -d "/Applications/Android Studio.app/Contents/jbr/Contents/Home" ]; then
-  export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+if [ -z "${JAVA_HOME:-}" ]; then
+  if [ -d "/Applications/Android Studio.app/Contents/jbr/Contents/Home" ]; then
+    export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+  elif [ -d "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home" ]; then
+    export JAVA_HOME="/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"
+  elif [ -d "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home" ]; then
+    export JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
+  fi
+fi
+if [ -n "${JAVA_HOME:-}" ]; then
+  export PATH="$JAVA_HOME/bin:$PATH"
 fi
 if [ -d "${ANDROID_HOME:-}" ]; then
   :

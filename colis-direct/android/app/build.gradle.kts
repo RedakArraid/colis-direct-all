@@ -1,3 +1,4 @@
+import java.nio.file.Files
 import java.util.Properties
 
 plugins {
@@ -43,6 +44,7 @@ android {
     productFlavors {
         create("dev") {
             dimension = "env"
+            isDefault = true
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
             buildConfigField("String", "API_BASE_URL", "\"${devApiBaseUrl.escapeForBuildConfigField()}\"")
@@ -108,6 +110,38 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+}
+
+/** Android Studio cherche parfois le variant « debug » ; on duplique les artefacts de devDebug. */
+tasks.register("syncIdeDebugRedirect") {
+    dependsOn("createDevDebugApkListingFileRedirect")
+    doLast {
+        val root = layout.buildDirectory.get().asFile
+        val devRedirect = root.resolve(
+            "intermediates/apk_ide_redirect_file/devDebug/createDevDebugApkListingFileRedirect/redirect.txt",
+        )
+        val debugRedirectDir = root.resolve(
+            "intermediates/apk_ide_redirect_file/debug/createDebugApkListingFileRedirect",
+        )
+        check(devRedirect.isFile) {
+            "Exécutez d'abord assembleDevDebug (redirect devDebug absent)."
+        }
+        debugRedirectDir.mkdirs()
+        devRedirect.copyTo(debugRedirectDir.resolve("redirect.txt"), overwrite = true)
+        val apkRoot = root.resolve("outputs/apk")
+        val legacyDebug = apkRoot.resolve("debug")
+        if (legacyDebug.exists()) legacyDebug.delete()
+        val devApkDir = apkRoot.resolve("dev/debug")
+        check(devApkDir.isDirectory) { "APK dev/debug absent." }
+        Files.createSymbolicLink(legacyDebug.toPath(), devApkDir.toPath())
+        logger.lifecycle("IDE redirect compat : debug → devDebug")
+    }
+}
+
+afterEvaluate {
+    tasks.matching { it.name == "assembleDevDebug" }.configureEach {
+        finalizedBy("syncIdeDebugRedirect")
     }
 }
 

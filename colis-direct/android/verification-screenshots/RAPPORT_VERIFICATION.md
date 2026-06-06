@@ -52,9 +52,33 @@ Compte : `e2e+client@colisdirect.test` (API staging par défaut sur flavor dev).
 | 10 | `10_historique_paiements.png` | Historique paiements | OK |
 | 11 | `11_mes_colis_vide.png` | Mes colis (récap) | OK — pas de colis en base E2E |
 
-**Non validé visuellement :** détail colis (aucun envoi sur le compte E2E), paiement Paystack, rôles relais/transporteur.
+**Non validé visuellement (automatisé) :** détail colis avec envoi existant, paiement Paystack bout en bout.
+
+## Captures staff (transporteur, relais, admin)
+
+```bash
+bash scripts/verify-screenshots-staff.sh emulator-5554
+```
+
+Dossier : `verification-screenshots/staff/` — connexion E2E via Profil (boutons dev).
+
+## Tout lancer
+
+```bash
+bash scripts/verify-all.sh emulator-5554
+```
 
 ---
+
+## Paiement & profil (scripts dédiés)
+
+```bash
+bash scripts/verify-screenshots-payment.sh emulator-5554
+```
+
+Dossier : `verification-screenshots/payment/` — moyens de paiement, création colis.
+
+Le script client connecté inclut aussi `12_profil_edit`, `13_moyens_paiement`, `14_parametres`.
 
 ## Relancer
 
@@ -62,6 +86,9 @@ Compte : `e2e+client@colisdirect.test` (API staging par défaut sur flavor dev).
 cd colis-direct/android
 ./scripts/verify-screenshots.sh emulator-5554
 bash scripts/verify-screenshots-connected.sh emulator-5554
+bash scripts/verify-screenshots-staff.sh emulator-5554
+bash scripts/verify-screenshots-payment.sh emulator-5554
+bash scripts/verify-all.sh emulator-5554
 ```
 
 API flavor **dev** : `https://staging-api.colisdirect.com/api/` (ou backend local via `dev.api.base.url` dans `local.properties`).

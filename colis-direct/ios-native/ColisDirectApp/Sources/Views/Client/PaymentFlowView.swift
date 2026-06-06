@@ -24,7 +24,7 @@ struct PaymentFlowView: View {
     @State private var cardCvv = ""
     @State private var saveCard = false
     
-    @State private var showSafari = false
+    @State private var showWebView = false
     @State private var paymentUrl: URL? = nil
     @State private var lastRef: String? = nil
 
@@ -34,6 +34,14 @@ struct PaymentFlowView: View {
         self.vm = vm
         _phone = State(initialValue: shipment.senderPhone ?? user?.phone ?? "")
         _cardName = State(initialValue: user?.fullName ?? "")
+        
+        let initialStep: PaymentStep
+        if shipment.paymentMethod?.lowercased() == "relay_cash" {
+            initialStep = .success(isRelayCash: true)
+        } else {
+            initialStep = .methodSelection
+        }
+        _currentStep = State(initialValue: initialStep)
     }
 
     var isSuccessStep: Bool {
@@ -41,6 +49,14 @@ struct PaymentFlowView: View {
             return true
         }
         return false
+    }
+
+    var totalAmount: Double {
+        let base = shipment.price ?? 0.0
+        let printing = shipment.printingFee ?? 0.0
+        let assistance = shipment.assistanceFee ?? 0.0
+        let box = shipment.boxPrice ?? 0.0
+        return base + printing + assistance + box
     }
 
     var body: some View {
@@ -93,15 +109,37 @@ struct PaymentFlowView: View {
             }
         }
         .background(Color.white)
-        .sheet(isPresented: $showSafari, onDismiss: {
+        .sheet(isPresented: $showWebView, onDismiss: {
             if let ref = lastRef {
                 Task {
                     await vm.verifyPayment(reference: ref, trackingNumber: shipment.trackingNumber)
                 }
             }
         }) {
-            if let url = paymentUrl {
-                SafariView(url: url)
+            NavigationStack {
+                if let url = paymentUrl {
+                    WebView(url: url) { targetURL in
+                        let urlStr = targetURL.absoluteString
+                        if urlStr.contains("payment-success") {
+                            if let extractedRef = extractReference(from: urlStr) {
+                                self.lastRef = extractedRef
+                            }
+                            self.showWebView = false
+                            self.currentStep = .success(isRelayCash: false)
+                        }
+                    }
+                    .navigationTitle("Paiement sécurisé")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Fermer") {
+                                showWebView = false
+                            }
+                        }
+                    }
+                } else {
+                    ProgressView()
+                }
             }
         }
     }
@@ -130,7 +168,7 @@ struct PaymentFlowView: View {
         ScrollView {
             VStack(spacing: 16) {
                 // PmAmount card
-                VStack(spacing: 12) {
+                VStack(spacing: 8) {
                     HStack {
                         let route = "\(shipment.senderCommune ?? "") → \(shipment.recipientCommune ?? "")"
                         Text(route)
@@ -141,6 +179,28 @@ struct PaymentFlowView: View {
                             .font(AppFont.semiBold(13))
                             .foregroundColor(.gray900)
                     }
+                    if let printing = shipment.printingFee, printing > 0 {
+                        HStack {
+                            Text("Impression au relais")
+                                .font(AppFont.regular(13))
+                                .foregroundColor(.gray700)
+                            Spacer()
+                            Text(formatPrice(printing))
+                                .font(AppFont.semiBold(13))
+                                .foregroundColor(.gray900)
+                        }
+                    }
+                    if let box = shipment.boxPrice, box > 0 {
+                        HStack {
+                            Text("Carton d'expédition")
+                                .font(AppFont.regular(13))
+                                .foregroundColor(.gray700)
+                            Spacer()
+                            Text(formatPrice(box))
+                                .font(AppFont.semiBold(13))
+                                .foregroundColor(.gray900)
+                        }
+                    }
                     Divider()
                         .background(Color.orangePrimary.opacity(0.3))
                     HStack {
@@ -148,7 +208,7 @@ struct PaymentFlowView: View {
                             .font(AppFont.bold(14))
                             .foregroundColor(.gray900)
                         Spacer()
-                        Text(formatPrice(shipment.price ?? 0.0))
+                        Text(formatPrice(totalAmount))
                             .font(AppFont.extraBold(22))
                             .foregroundColor(.orangePrimary)
                     }
@@ -169,7 +229,7 @@ struct PaymentFlowView: View {
                     methodRow(id: "wave", name: "Wave", desc: "Paiement instantané", logoName: "W", color: Color(hex: "#1DC8FF"))
                     methodRow(id: "moov", name: "Moov Money", desc: "Paiement instantané", logoName: "Moov", color: Color(hex: "#0066B3"))
                     methodRow(id: "card", name: "Carte bancaire", desc: "Visa, Mastercard", logoName: "CB", color: .gray500)
-                    methodRow(id: "cash", name: "Espèces à la livraison", desc: "Payé par le destinataire", logoName: "ESP", color: .greenSuccess)
+                    methodRow(id: "relay_cash", name: "Paiement lors de la prise en charge", desc: "Réglez en espèces ou par transfert lors du dépôt", logoName: "ESP", color: .greenSuccess)
                 }
                 
                 HStack(spacing: 8) {
@@ -250,7 +310,7 @@ struct PaymentFlowView: View {
         switch selectedMethodId {
         case "card":
             currentStep = .card
-        case "cash":
+        case "relay_cash":
             Task {
                 await vm.switchToRelayPayment(trackingNumber: shipment.trackingNumber)
             }
@@ -320,7 +380,7 @@ struct PaymentFlowView: View {
                     
                     let steps = [
                         "Saisissez votre numéro \(operatorName)",
-                        "Validez le montant de \(formatPrice(shipment.price ?? 0.0))",
+                        "Validez le montant de \(formatPrice(totalAmount))",
                         "Confirmez avec votre code secret"
                     ]
                     
@@ -348,7 +408,7 @@ struct PaymentFlowView: View {
                         .font(AppFont.regular(14))
                         .foregroundColor(.gray500)
                     Spacer()
-                    Text(formatPrice(shipment.price ?? 0.0))
+                    Text(formatPrice(totalAmount))
                         .font(AppFont.extraBold(26))
                         .foregroundColor(.orangePrimary)
                 }
@@ -368,7 +428,7 @@ struct PaymentFlowView: View {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         } else {
-                            Text("Ouvrir \(formatPrice(shipment.price ?? 0.0))")
+                            Text("Ouvrir \(formatPrice(totalAmount))")
                                 .font(AppFont.bold(15))
                         }
                     }
@@ -607,7 +667,7 @@ struct PaymentFlowView: View {
                             .font(AppFont.regular(14))
                             .foregroundColor(.white.opacity(0.9))
                         
-                        Text(formatPrice(shipment.price ?? 0.0))
+                        Text(formatPrice(totalAmount))
                             .font(AppFont.extraBold(34))
                             .foregroundColor(.white)
                             .padding(.top, 8)
@@ -621,8 +681,29 @@ struct PaymentFlowView: View {
                         VStack(spacing: 0) {
                             detailRow(label: "N° de suivi", value: shipment.trackingNumber, isOrange: true)
                             Divider()
-                            detailRow(label: "Mode de paiement", value: isRelayCash ? "Espèces au relais" : (selectedMethodId == "card" ? "Carte bancaire" : "Mobile Money"))
+                            let modeText: String = {
+                                if isRelayCash {
+                                    return "Paiement lors de la prise en charge"
+                                }
+                                let method = (shipment.paymentMethod ?? selectedMethodId).lowercased()
+                                if method == "card" {
+                                    return "Carte bancaire"
+                                } else if method == "relay_cash" {
+                                    return "Paiement lors de la prise en charge"
+                                } else {
+                                    return "Paiement en ligne"
+                                }
+                            }()
+                            detailRow(label: "Mode de paiement", value: modeText)
                             Divider()
+                            if let printing = shipment.printingFee, printing > 0 {
+                                detailRow(label: "Impression au relais", value: formatPrice(printing))
+                                Divider()
+                            }
+                            if let box = shipment.boxPrice, box > 0 {
+                                detailRow(label: "Carton d'expédition", value: formatPrice(box))
+                                Divider()
+                            }
                             if let ref = lastRef {
                                 detailRow(label: "N° de transaction", value: ref)
                                 Divider()
@@ -635,24 +716,106 @@ struct PaymentFlowView: View {
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.gray200, lineWidth: 1))
                         .padding(.horizontal)
                         
-                        // QR Code placeholder / instructions
-                        HStack(spacing: 12) {
-                            Image(systemName: "qrcode")
-                                .font(.system(size: 36))
-                                .foregroundColor(.orangePrimary)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Reçu disponible")
-                                    .font(AppFont.bold(13))
-                                    .foregroundColor(.gray900)
-                                Text("Présentez ce numéro de suivi au point relais")
-                                    .font(AppFont.regular(12))
-                                    .foregroundColor(.gray500)
+                        // Important Instructions Card
+                        if let code = shipment.shipmentCode, !code.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack(alignment: .top, spacing: 10) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundColor(.orangePrimary)
+                                        .font(.system(size: 20))
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Important : Inscrivez sur le colis")
+                                            .font(AppFont.bold(15))
+                                            .foregroundColor(.gray900)
+                                        Text("Avant de déposer ou de faire ramasser votre colis, écrivez clairement ces informations sur l'emballage :")
+                                            .font(AppFont.regular(12))
+                                            .foregroundColor(.gray600)
+                                    }
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        Text("Destinataire :").font(AppFont.bold(13)).foregroundColor(.gray700)
+                                        Spacer()
+                                        Text(shipment.recipientName ?? "—").font(AppFont.medium(13)).foregroundColor(.gray900)
+                                    }
+                                    HStack {
+                                        Text("Téléphone :").font(AppFont.bold(13)).foregroundColor(.gray700)
+                                        Spacer()
+                                        Text(shipment.recipientPhone ?? "—").font(AppFont.medium(13)).foregroundColor(.gray900)
+                                    }
+                                    Divider()
+                                    VStack(alignment: .center, spacing: 4) {
+                                        Text("NUMÉRO D'ENVOI").font(AppFont.bold(11)).foregroundColor(.gray500)
+                                        Text(code)
+                                            .font(.system(size: 28, weight: .bold, design: .monospaced))
+                                            .foregroundColor(.orangePrimary)
+                                            .padding(.vertical, 6)
+                                            .frame(maxWidth: .infinity)
+                                            .background(Color.orangePrimary.opacity(0.08))
+                                            .cornerRadius(8)
+                                        Text("Inscrivez ce code (4 chiffres + 2 lettres) clairement sur le colis")
+                                            .font(AppFont.regular(11))
+                                            .foregroundColor(.gray500)
+                                            .multilineTextAlignment(.center)
+                                    }
+                                    .padding(.top, 4)
+                                }
+                                .padding()
+                                .background(Color.white)
+                                .cornerRadius(12)
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray200, lineWidth: 1))
                             }
-                            Spacer()
+                            .padding()
+                            .background(Color.orangePrimary.opacity(0.05))
+                            .cornerRadius(14)
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.orangePrimary.opacity(0.2), lineWidth: 1.5))
+                            .padding(.horizontal)
+                        }
+
+                        // Guidelines Card
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(alignment: .top, spacing: 10) {
+                                Image(systemName: "info.circle.fill")
+                                    .foregroundColor(.blueInfo)
+                                    .font(.system(size: 20))
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Instructions de livraison")
+                                        .font(AppFont.bold(15))
+                                        .foregroundColor(.gray900)
+                                    
+                                    let pickupModeText: String = {
+                                        if (shipment.deliveryMode ?? "").contains("home_to") {
+                                            return "Un transporteur viendra ramasser le colis à l'adresse de départ."
+                                        } else {
+                                            return "Déposez votre colis dans n'importe quel point relais ColisDirect."
+                                        }
+                                    }()
+                                    let deliveryModeText: String = {
+                                        if (shipment.deliveryMode ?? "").contains("to_home") {
+                                            return "Le destinataire sera livré directement à son adresse."
+                                        } else {
+                                            return "Le destinataire sera notifié dès que le colis arrive au relais de destination."
+                                        }
+                                    }()
+                                    
+                                    Text("1. \(pickupModeText)")
+                                        .font(AppFont.regular(13))
+                                        .foregroundColor(.gray700)
+                                        .padding(.top, 4)
+                                    Text("2. \(deliveryModeText)")
+                                        .font(AppFont.regular(13))
+                                        .foregroundColor(.gray700)
+                                    Text("3. Suivez votre colis à tout moment avec son numéro de suivi.")
+                                        .font(AppFont.regular(13))
+                                        .foregroundColor(.gray700)
+                                }
+                            }
                         }
                         .padding()
-                        .background(Color.orangePrimary.opacity(0.1))
+                        .background(Color.blueInfo.opacity(0.05))
                         .cornerRadius(14)
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.blueInfo.opacity(0.2), lineWidth: 1.5))
                         .padding(.horizontal)
                     }
                 }
@@ -713,27 +876,30 @@ struct PaymentFlowView: View {
         .padding(.vertical, 14)
     }
 
+    func extractReference(from urlString: String) -> String? {
+        if let range = urlString.range(of: "reference=") {
+            let sub = urlString[range.upperBound...]
+            let ref = sub.prefix(while: { $0 != "&" && $0 != "#" })
+            return String(ref)
+        }
+        if let range = urlString.range(of: "trxref=") {
+            let sub = urlString[range.upperBound...]
+            let ref = sub.prefix(while: { $0 != "&" && $0 != "#" })
+            return String(ref)
+        }
+        return nil
+    }
+
     func startPaymentProcess() {
         Task {
             if let result = await vm.initiatePaystackPayment(shipment: shipment, user: user) {
                 if let url = URL(string: result.0) {
                     self.paymentUrl = url
                     self.lastRef = result.1
-                    self.showSafari = true
+                    self.showWebView = true
                     self.currentStep = .success(isRelayCash: false)
                 }
             }
         }
     }
-}
-
-// MARK: - SafariView (SFSafariViewController wrapper)
-struct SafariView: UIViewControllerRepresentable {
-    let url: URL
-    
-    func makeUIViewController(context: Context) -> SFSafariViewController {
-        return SFSafariViewController(url: url)
-    }
-    
-    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
 }

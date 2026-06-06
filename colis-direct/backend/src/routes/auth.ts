@@ -1,22 +1,58 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { pool } from '../db/connection';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { validateBody } from '../middleware/validate';
+import { signupSchema, signinSchema, refreshTokenSchema } from '../schemas/authSchemas';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const JWT_ACCESS_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || '1h';
+const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '30d';
+
+function hashToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+function getClientIp(req: express.Request): string {
+  return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+}
+
+async function issueTokenPair(
+  user: { id: string; email: string; role: string },
+  req: express.Request
+): Promise<{ token: string; refresh_token: string }> {
+  const payload = { id: user.id, email: user.email, role: user.role };
+  const token = jwt.sign(payload, JWT_SECRET as string, {
+    expiresIn: JWT_ACCESS_EXPIRES_IN as unknown as number,
+  });
+
+  const refresh_token = crypto.randomBytes(48).toString('base64url');
+  const refreshDays = parseInt(String(JWT_REFRESH_EXPIRES_IN).replace(/\D/g, ''), 10) || 30;
+  const expiresAt = new Date(Date.now() + refreshDays * 24 * 60 * 60 * 1000);
+
+  await pool.query(
+    `INSERT INTO refresh_tokens (user_id, token_hash, expires_at, user_agent, ip_address)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [
+      user.id,
+      hashToken(refresh_token),
+      expiresAt,
+      (req.headers['user-agent'] as string) || null,
+      getClientIp(req),
+    ]
+  );
+
+  return { token, refresh_token };
+}
 
 // In-memory rate limiter — counts only FAILED auth attempts per IP
 // Max 10 failures per 5-minute window.
 const authAttempts = new Map<string, { count: number; resetAt: number }>();
 const AUTH_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 const AUTH_MAX_ATTEMPTS = parseInt(process.env.AUTH_RATE_LIMIT_MAX || '10', 10);
-
-function getClientIp(req: express.Request): string {
-  return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
-}
 
 function isRateLimited(ip: string): { blocked: boolean; retryAfterSec: number } {
   const now = Date.now();
@@ -60,7 +96,7 @@ function authRateLimit(req: express.Request, res: express.Response, next: expres
 const SIGNUP_MIN_PASSWORD_LEN = 6;
 
 // Sign up — rôle toujours « client » côté serveur (pas d’élévation via le body)
-router.post('/signup', authRateLimit, async (req, res) => {
+router.post('/signup', authRateLimit, validateBody(signupSchema), async (req, res) => {
   try {
     const { email, password, first_name, last_name, phone } = req.body;
     const role = 'client';
@@ -105,10 +141,7 @@ router.post('/signup', authRateLimit, async (req, res) => {
     );
 
     const user = result.rows[0];
-
-    // Generate token
-    const payload = { id: user.id, email: user.email, role: user.role };
-    const token = jwt.sign(payload, JWT_SECRET as string, { expiresIn: JWT_EXPIRES_IN as unknown as number });
+    const { token, refresh_token } = await issueTokenPair(user, req);
 
     res.status(201).json({
       user: {
@@ -122,6 +155,7 @@ router.post('/signup', authRateLimit, async (req, res) => {
         is_pro: user.is_pro,
       },
       token,
+      refresh_token,
     });
   } catch (error: any) {
     console.error('Signup error:', error);
@@ -130,7 +164,7 @@ router.post('/signup', authRateLimit, async (req, res) => {
 });
 
 // Sign in (with email OR phone)
-router.post('/signin', authRateLimit, async (req, res) => {
+router.post('/signin', authRateLimit, validateBody(signinSchema), async (req, res) => {
   try {
     const { email, phone, password } = req.body;
 
@@ -175,9 +209,7 @@ router.post('/signin', authRateLimit, async (req, res) => {
       return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
     }
 
-    // Generate token
-    const payload = { id: user.id, email: user.email, role: user.role };
-    const token = jwt.sign(payload, JWT_SECRET as string, { expiresIn: JWT_EXPIRES_IN as unknown as number });
+    const { token, refresh_token } = await issueTokenPair(user, req);
 
     res.json({
       user: {
@@ -191,6 +223,7 @@ router.post('/signin', authRateLimit, async (req, res) => {
         is_pro: user.is_pro,
       },
       token,
+      refresh_token,
     });
   } catch (error: any) {
     console.error('Signin error:', error);
@@ -219,9 +252,55 @@ router.get('/me', authenticate, async (req: AuthRequest, res) => {
   }
 });
 
-// Sign out (client-side token removal)
-router.post('/signout', authenticate, (_req, res) => {
-  res.json({ message: 'Signed out successfully' });
+// Rafraîchir le token d'accès
+router.post('/refresh', validateBody(refreshTokenSchema), async (req, res) => {
+  try {
+    const { refresh_token } = req.body;
+    const tokenHash = hashToken(refresh_token);
+
+    const row = await pool.query(
+      `SELECT rt.id, rt.user_id, u.email, u.role
+       FROM refresh_tokens rt
+       JOIN users u ON u.id = rt.user_id
+       WHERE rt.token_hash = $1
+         AND rt.revoked_at IS NULL
+         AND rt.expires_at > NOW()`,
+      [tokenHash]
+    );
+
+    if (row.rows.length === 0) {
+      return res.status(401).json({ error: 'Refresh token invalide ou expiré', code: 'REFRESH_INVALID' });
+    }
+
+    const { id: rtId, user_id, email, role } = row.rows[0];
+
+    // Rotation : révoquer l'ancien refresh token
+    await pool.query(`UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1`, [rtId]);
+
+    const { token, refresh_token: newRefresh } = await issueTokenPair(
+      { id: user_id, email, role },
+      req
+    );
+
+    res.json({ token, refresh_token: newRefresh });
+  } catch (error: any) {
+    console.error('Refresh token error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Sign out — révoque les refresh tokens de l'utilisateur
+router.post('/signout', authenticate, async (req: AuthRequest, res) => {
+  try {
+    await pool.query(
+      `UPDATE refresh_tokens SET revoked_at = NOW()
+       WHERE user_id = $1 AND revoked_at IS NULL`,
+      [req.user!.id]
+    );
+    res.json({ message: 'Signed out successfully' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 export default router;

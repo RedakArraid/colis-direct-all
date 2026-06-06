@@ -8,6 +8,6 @@ cd "$ROOT"
 # shellcheck source=_android-env.sh
 source "$(dirname "$0")/_android-env.sh"
 
-./gradlew assembleDevDebug "$@"
+./gradlew assembleDevDebug syncIdeDebugRedirect "$@"
 echo ""
 echo "APK: app/build/outputs/apk/dev/debug/app-dev-debug.apk"

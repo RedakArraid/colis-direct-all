@@ -3,6 +3,9 @@
 
 sdk.dir=/chemin/vers/Android/sdk
 
+# Si `./gradlew` affiche « Unable to locate a Java Runtime » (terminal sans JAVA_HOME) :
+# java.home=/Applications/Android Studio.app/Contents/jbr/Contents/Home
+
 # ── Flavor dev (APK ci.colisdirect.app.dev) ─────────────────────────────────
 # Par défaut si absent : https://staging-api.colisdirect.com/api/
 # (même API / BDD que les comptes E2E e2e+*@colisdirect.test)
@@ -15,3 +18,9 @@ sdk.dir=/chemin/vers/Android/sdk
 
 # Backend local — téléphone physique (remplacer par l’IP du Mac sur le LAN) :
 # dev.api.base.url=http://192.168.1.10:3001/api/
+
+# ── Signature release (flavor prod, AAB Play Store) ─────────────────────────
+# storeFile=/chemin/vers/colisdirect-release.keystore
+# storePassword=***
+# keyAlias=colisdirect
+# keyPassword=***

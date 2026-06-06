@@ -5,11 +5,15 @@ import { prepareCleanVisitorContext } from '../support/app';
 
 async function openSignupForm(page: import('@playwright/test').Page) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  // Ouvrir la page de connexion via le header
-  await page.getByRole('navigation').getByRole('button', { name: /Connexion/i }).first().click();
+  await page.getByRole('button', { name: /S'inscrire/i }).first().click();
   await waitForPageContent(page);
-  // Basculer vers l'inscription ("Pas encore de compte? Créer un compte")
-  await page.getByRole('button', { name: /Créer un compte|S'inscrire|Pas encore/i }).first().click();
+  await expect(page.getByRole('heading', { name: /Se connecter/i })).toBeVisible();
+  await page
+    .locator('p')
+    .filter({ hasText: /Pas encore de compte/i })
+    .getByRole('button', { name: "S'inscrire" })
+    .click();
+  await expect(page.getByRole('heading', { name: /Créer un compte/i })).toBeVisible();
   await waitForPageContent(page);
 }
 
@@ -23,7 +27,7 @@ test.describe('Inscription client — formulaire', () => {
 
     await openSignupForm(page);
 
-    await expect(page.getByPlaceholder(/Prénom/i).or(page.getByLabel(/Prénom/i))).toBeVisible();
+    await expect(page.getByPlaceholder(/Votre prénom/i).or(page.getByLabel(/Prénom/i))).toBeVisible();
     await expect(page.getByPlaceholder(/Nom/i).or(page.getByLabel(/Nom/i)).first()).toBeVisible();
     await expect(page.getByPlaceholder(/email/i).or(page.getByLabel(/email/i)).first()).toBeVisible();
     await expect(page.locator('input[inputmode="numeric"]').first()).toBeVisible();
@@ -103,11 +107,11 @@ test.describe('Inscription client — formulaire', () => {
       await passwordFields.nth(1).fill('abc');
     }
 
-    await submitForm(page, /Créer mon compte|S'inscrire|Valider/i);
+    await submitForm(page, /Créer mon compte/i);
 
     const errorVisible = await page
-      .locator('[class*="error"], [class*="alert"], [role="alert"]')
-      .or(page.getByText(/6 caractères|trop court|minimum|au moins/i))
+      .getByText(/6 caractères|trop court|minimum|au moins/i)
+      .or(page.locator('[class*="error"], [class*="alert"], [role="alert"]'))
       .first()
       .isVisible({ timeout: 5_000 })
       .catch(() => false);

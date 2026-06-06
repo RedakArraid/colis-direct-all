@@ -34,7 +34,6 @@ fun MobileHomeScreen(
     onShipmentClick: (String) -> Unit,
     onTrackNumber: (String) -> Unit,
     onNotificationsClick: () -> Unit,
-    onOpenPricing: () -> Unit = {},
     onOpenPartner: (String?) -> Unit = {},
     onOpenPartnerLivreur: () -> Unit = { onOpenPartner("livreur") },
     onOpenPartnerRelais: () -> Unit = { onOpenPartner("relais") },
@@ -47,8 +46,6 @@ fun MobileHomeScreen(
     val clientState by clientViewModel.uiState.collectAsState()
     val notifications by notificationsViewModel.notifications.collectAsState()
     val unreadCount = notifications.count { it.unread }
-    var trackingInput by remember { mutableStateOf("") }
-
     val isLoggedIn = authState.isLoggedIn && authState.user != null
     val firstName = authState.user?.firstName
 
@@ -67,6 +64,9 @@ fun MobileHomeScreen(
             val status = (s.effectiveStatus ?: s.currentStatus ?: "").uppercase()
             !isTerminalShipmentStatus(status)
         }
+    }
+    val lastShipment = remember(clientState.shipments) {
+        clientState.shipments.maxByOrNull { it.createdAt.orEmpty() }
     }
 
     Column(
@@ -99,160 +99,166 @@ fun MobileHomeScreen(
             }
         }
 
-        // Hero orange — aligné Capacitor renderHome
+        if (isLoggedIn && !firstName.isNullOrBlank()) {
+            Text(
+                "Bonjour $firstName 👋",
+                fontFamily = InterFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
+                color = Gray600,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
+
+        // Hero maquette — gradient pêche + illustration
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(bottomStart = 0.dp, bottomEnd = 0.dp))
+                .clip(RoundedCornerShape(20.dp))
                 .background(
-                    Brush.verticalGradient(
-                        colors = listOf(OrangePrimary, Color(0xFFFF8533)),
+                    Brush.linearGradient(
+                        colors = listOf(Color(0xFFFFF6EE), Color(0xFFFFE8D2)),
                     ),
                 )
-                .padding(horizontal = 16.dp, vertical = 20.dp),
+                .padding(18.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                 Text(
-                    if (isLoggedIn && !firstName.isNullOrBlank()) "Bonjour $firstName 👋" else "Bonjour 👋",
-                    fontFamily = InterFontFamily,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                    color = Color.White.copy(alpha = 0.95f),
-                )
-                Text(
-                    if (isLoggedIn) "Que souhaitez-vous faire ?" else "Bienvenue sur ColisDirect",
+                    "Envoyez et recevez vos colis en toute sécurité",
                     fontFamily = InterFontFamily,
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = 20.sp,
-                    color = Color.White,
+                    fontSize = 22.sp,
+                    color = Gray900,
                     lineHeight = 26.sp,
+                    modifier = Modifier.weight(0.58f),
                 )
-
-                // Suivi rapide
-                Column(
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .size(120.dp)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color.White.copy(alpha = 0.12f))
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                        .background(OrangeLight),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Icon(Icons.Default.Search, null, tint = Color.White, modifier = Modifier.size(14.dp))
-                        Text(
-                            "Suivi rapide",
-                            fontFamily = InterFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            color = Color.White,
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        OutlinedTextField(
-                            value = trackingInput,
-                            onValueChange = { trackingInput = it.uppercase() },
-                            placeholder = {
-                                Text(
-                                    "Ex: CD202605290001CI",
-                                    fontFamily = InterFontFamily,
-                                    fontSize = 12.sp,
-                                    color = Gray400,
-                                )
-                            },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            shape = RoundedCornerShape(10.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color.White,
-                                unfocusedContainerColor = Color.White,
-                                focusedBorderColor = Color.Transparent,
-                                unfocusedBorderColor = Color.Transparent,
-                            ),
-                            textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                fontFamily = InterFontFamily,
-                                fontSize = 13.sp,
-                                color = Gray900,
-                            ),
-                        )
-                        Button(
-                            onClick = {
-                                val v = trackingInput.trim()
-                                if (v.isNotEmpty()) onTrackNumber(v)
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
-                        ) {
-                            Text("Suivre", fontFamily = InterFontFamily, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
-                    }
+                    Icon(
+                        Icons.Default.LocalShipping,
+                        contentDescription = null,
+                        tint = OrangePrimary,
+                        modifier = Modifier.size(56.dp),
+                    )
                 }
             }
         }
 
-        // Services rapides
-        Card(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .offset(y = (-8).dp),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                Text(
-                    "SERVICES RAPIDES",
-                    fontFamily = InterFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                    color = Gray500,
-                    letterSpacing = 0.8.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-                val quickActions = listOf(
-                    Triple(Icons.Default.Inventory2, "Envoyer", onCreateShipment),
-                    Triple(Icons.Default.Search, "Suivre", {
-                        val v = trackingInput.trim()
-                        if (v.isNotEmpty()) onTrackNumber(v)
-                    }),
-                    Triple(Icons.Default.Map, "Relais", { onNavigateToTab(3) }),
-                    Triple(Icons.Default.AttachMoney, "Tarifs", onOpenPricing),
-                    Triple(Icons.Default.History, "Historique", { onNavigateToTab(1) }),
-                    Triple(Icons.Default.SupportAgent, "Support", { onOpenPartner(null) }),
-                )
-                quickActions.chunked(3).forEach { row ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        row.forEach { (icon, label, action) ->
-                            ServiceTile(
-                                modifier = Modifier.weight(1f),
-                                icon = icon,
-                                iconBg = OrangeLight,
-                                iconTint = OrangePrimary,
-                                label = label,
-                                onClick = action,
-                            )
-                        }
-                        repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
-                    }
-                }
+            Button(
+                onClick = onCreateShipment,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary),
+                shape = RoundedCornerShape(10.dp),
+            ) {
+                Text("Envoyer un colis", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+            OutlinedButton(
+                onClick = { onNavigateToTab(2) },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.5.dp, Gray300),
+            ) {
+                Text("Suivre un colis", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Gray900)
             }
         }
 
-        Spacer(Modifier.height(12.dp))
+        // Services rapides (2 actions)
+        Text(
+            "SERVICES RAPIDES",
+            fontFamily = InterFontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = 11.sp,
+            color = Gray500,
+            letterSpacing = 0.8.sp,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            QuickServiceTile(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Default.Inventory2,
+                label = "Envoyer un colis",
+                onClick = onCreateShipment,
+            )
+            QuickServiceTile(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Default.Map,
+                label = "Retrouver un point relais",
+                onClick = { onNavigateToTab(3) },
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Dernier envoi
+        if (isLoggedIn && lastShipment != null) {
+            Text(
+                "DERNIER ENVOI",
+                fontFamily = InterFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+                color = Gray500,
+                letterSpacing = 0.8.sp,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+            val ls = lastShipment!!
+            val route = "${ls.senderCommune ?: "—"} → ${ls.recipientCommune ?: "—"}"
+            val statusLabel = (ls.effectiveStatus ?: ls.currentStatus ?: "—").replace('_', ' ')
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .clickable { onShipmentClick(ls.id) },
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, Gray300),
+            ) {
+                Row(
+                    Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Box(
+                        Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(OrangeLight),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.Inventory2, null, tint = OrangePrimary)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            ls.trackingNumber,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = Gray900,
+                        )
+                        Text("$route · $statusLabel", fontSize = 12.sp, color = Gray500)
+                    }
+                    Icon(Icons.Default.ChevronRight, null, tint = Gray400)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+
+        Spacer(Modifier.height(4.dp))
 
         // Colis en cours
         if (isLoggedIn) {
@@ -412,93 +418,47 @@ fun MobileHomeScreen(
             }
         }
 
-        Spacer(Modifier.height(16.dp))
-
-        // Tarifs CTA
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(Brush.linearGradient(listOf(Color(0xFF0F0F0F), Color(0xFF1A1A2E))))
-                .padding(20.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    "TARIFS TRANSPARENTS",
-                    fontFamily = InterFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                    color = OrangePrimary,
-                    letterSpacing = 1.sp,
-                )
-                Text(
-                    "Dès 600 FCFA",
-                    fontFamily = InterFontFamily,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 22.sp,
-                    color = Color.White,
-                )
-                Text(
-                    "Envoyez partout en Côte d'Ivoire.",
-                    fontFamily = InterFontFamily,
-                    fontSize = 13.sp,
-                    color = Color.White.copy(alpha = 0.65f),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
-                Button(
-                    onClick = onOpenPricing,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary),
-                    shape = RoundedCornerShape(12.dp),
-                ) {
-                    Text("Voir tous les tarifs", fontWeight = FontWeight.Bold)
-                    Icon(Icons.Default.ArrowForward, null, modifier = Modifier.size(16.dp))
-                }
-            }
-        }
-
         Spacer(Modifier.height(88.dp))
     }
 }
 
 @Composable
-private fun ServiceTile(
+private fun QuickServiceTile(
     modifier: Modifier,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    iconBg: Color,
-    iconTint: Color,
     label: String,
     onClick: () -> Unit,
 ) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
-            .padding(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    Card(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Gray300),
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(iconBg),
-            contentAlignment = Alignment.Center,
+        Column(
+            Modifier.padding(vertical = 14.dp, horizontal = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(icon, null, tint = iconTint, modifier = Modifier.size(24.dp))
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(OrangeLight),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, null, tint = OrangePrimary, modifier = Modifier.size(20.dp))
+            }
+            Text(
+                label,
+                fontFamily = InterFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 10.sp,
+                color = Gray600,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                lineHeight = 13.sp,
+                maxLines = 3,
+            )
         }
-        Text(
-            label,
-            fontFamily = InterFontFamily,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 12.sp,
-            color = Gray900,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
     }
 }

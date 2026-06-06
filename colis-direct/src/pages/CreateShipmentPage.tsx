@@ -76,6 +76,18 @@ function CreateShipmentPage({ onNavigate }: CreateShipmentPageProps) {
   } | null>(null);
   const [relayCashPendingTracking, setRelayCashPendingTracking] = useState<string | null>(null);
   const [promoCodeEnabled, setPromoCodeEnabled] = useState(true);
+  const [senderCoords, setSenderCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  // Position GPS expéditeur (ramassage à domicile) — utilisée pour le suivi livreur
+  useEffect(() => {
+    if (formData?.pickup_method !== 'home_pickup' || senderCoords) return;
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setSenderCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+      () => { /* refus GPS : le dispatch utilise la commune */ },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+    );
+  }, [formData?.pickup_method, senderCoords]);
 
   useEffect(() => {
     api.getPublicSettings().then(({ data }) => {
@@ -426,6 +438,9 @@ function CreateShipmentPage({ onNavigate }: CreateShipmentPageProps) {
                     pickup_method: formData.pickup_method,
                     origin_relay_id: formData.pickup_method === 'home_pickup' ? null : (selectedPickupRelay || null),
                     destination_relay_id: selectedDeliveryRelay || null,
+                    ...(formData.pickup_method === 'home_pickup' && senderCoords
+                      ? { sender_latitude: senderCoords.latitude, sender_longitude: senderCoords.longitude }
+                      : {}),
                   };
 
                   if (isPromoFree) {

@@ -67,7 +67,6 @@ Redirection : splash + connexion Profil (boutons E2E en dev). Un staff **ne doit
 | Profil | `LoginScreen` / `ClientProfileScreen` | profil |
 | Création | `CreateShipmentScreen` | `CreateShipmentPage` |
 | Détail colis | `ShipmentDetailScreen` | détail + paiement en ligne |
-| Tarifs | `PricingScreen` | tarifs |
 | Partenaire | `PartnerScreen` | partenaire |
 | Notifications | `NotificationsScreen` | notifications |
 

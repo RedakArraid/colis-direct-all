@@ -14,7 +14,27 @@ enum APIError: Error, LocalizedError {
         case .invalidURL: return "URL invalide"
         case .networkError(let e): return "Erreur réseau: \(e.localizedDescription)"
         case .serverError(_, let msg): return msg ?? "Erreur serveur"
-        case .decodingError: return "Erreur de décodage"
+        case .decodingError(let error):
+            var detail = error.localizedDescription
+            if let decError = error as? DecodingError {
+                switch decError {
+                case .typeMismatch(let type, let context):
+                    let path = context.codingPath.map { $0.stringValue }.joined(separator: ".")
+                    detail = "Type mismatch: expected \(type) at '\(path)' - \(context.debugDescription)"
+                case .valueNotFound(let type, let context):
+                    let path = context.codingPath.map { $0.stringValue }.joined(separator: ".")
+                    detail = "Value not found: expected \(type) at '\(path)' - \(context.debugDescription)"
+                case .keyNotFound(let key, let context):
+                    let path = context.codingPath.map { $0.stringValue }.joined(separator: ".")
+                    detail = "Key '\(key.stringValue)' not found at '\(path)' - \(context.debugDescription)"
+                case .dataCorrupted(let context):
+                    let path = context.codingPath.map { $0.stringValue }.joined(separator: ".")
+                    detail = "Data corrupted at '\(path)' - \(context.debugDescription)"
+                @unknown default:
+                    detail = error.localizedDescription
+                }
+            }
+            return "Erreur de décodage: \(detail)"
         case .unauthorized: return "Session expirée. Veuillez vous reconnecter."
         case .unknown: return "Erreur inconnue"
         }
@@ -56,6 +76,8 @@ final class APIService: @unchecked Sendable {
 
         if let body = body {
             req.httpBody = try JSONEncoder().encode(body)
+        } else if ["POST", "PUT", "PATCH"].contains(method) {
+            req.httpBody = "{}".data(using: .utf8)
         }
 
         let (data, response) = try await session.data(for: req)
@@ -84,6 +106,10 @@ final class APIService: @unchecked Sendable {
             let decoder = JSONDecoder()
             return try decoder.decode(T.self, from: data)
         } catch {
+            print("❌ DECODING ERROR for type '\(T.self)': \(error)")
+            if let rawString = String(data: data, encoding: .utf8) {
+                print("Raw JSON response: \(rawString)")
+            }
             throw APIError.decodingError(error)
         }
     }
@@ -133,11 +159,15 @@ final class APIService: @unchecked Sendable {
     }
 
     func cancelShipment(trackingNumber: String) async throws -> SuccessResponse {
-        try await request(endpoint: "shipments/\(trackingNumber)/cancel", method: "POST")
+        let trimmed = trackingNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        let escaped = trimmed.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? trimmed
+        return try await request(endpoint: "shipments/\(escaped)/cancel", method: "POST")
     }
 
     func switchToRelayPayment(trackingNumber: String) async throws -> SuccessResponse {
-        try await request(endpoint: "shipments/\(trackingNumber)/switch-to-relay-payment", method: "POST")
+        let trimmed = trackingNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        let escaped = trimmed.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? trimmed
+        return try await request(endpoint: "shipments/\(escaped)/switch-to-relay-payment", method: "POST")
     }
 
     func initPaystack(
@@ -164,11 +194,15 @@ final class APIService: @unchecked Sendable {
 
     // MARK: - Tracking
     func getPublicTracking(trackingNumber: String) async throws -> TrackingResponse {
-        try await request(endpoint: "tracking/\(trackingNumber)", authenticated: false)
+        let trimmed = trackingNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        let escaped = trimmed.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? trimmed
+        return try await request(endpoint: "tracking/\(escaped)", authenticated: false)
     }
 
     func getTracking(trackingNumber: String) async throws -> TrackingResponse {
-        try await request(endpoint: "tracking/\(trackingNumber)")
+        let trimmed = trackingNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        let escaped = trimmed.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? trimmed
+        return try await request(endpoint: "tracking/\(escaped)")
     }
 
     // MARK: - Relay Points
@@ -189,33 +223,33 @@ final class APIService: @unchecked Sendable {
     // MARK: - Scan (Relay)
     func relayIntake(trackingNumber: String) async throws -> ScanResponse {
         let body = RelayIntakeRequest(trackingNumber: trackingNumber)
-        return try await request(endpoint: "scan/relay-intake", method: "POST", body: body)
+        return try await request(endpoint: "scan/extras/relay-intake", method: "POST", body: body)
     }
 
     func relayFinalIntake(trackingNumber: String) async throws -> ScanResponse {
         let body = RelayIntakeRequest(trackingNumber: trackingNumber)
-        return try await request(endpoint: "scan/relay-final-intake", method: "POST", body: body)
+        return try await request(endpoint: "scan/extras/relay-final-intake", method: "POST", body: body)
     }
 
     func makeAvailable(trackingNumber: String) async throws -> ScanResponse {
         let body = RelayIntakeRequest(trackingNumber: trackingNumber)
-        return try await request(endpoint: "scan/ops/make-available", method: "POST", body: body)
+        return try await request(endpoint: "scan/extras/ops/make-available", method: "POST", body: body)
     }
 
-    func completeDelivery(trackingNumber: String, recipientPhone: String) async throws -> ScanResponse {
-        let body = CompleteDeliveryRequest(trackingNumber: trackingNumber, recipientPhone: recipientPhone)
-        return try await request(endpoint: "scan/relay/complete-delivery", method: "POST", body: body)
+    func completeDelivery(trackingNumber: String, pickupCode: String, recipientIdentifier: String? = nil) async throws -> ScanResponse {
+        let body = CompleteDeliveryRequest(trackingNumber: trackingNumber, pickupCode: pickupCode, recipientIdentifier: recipientIdentifier)
+        return try await request(endpoint: "scan/extras/relay/complete-delivery", method: "POST", body: body)
     }
 
     // MARK: - Scan (Transporter)
     func carrierPickup(trackingNumber: String) async throws -> ScanResponse {
         let body = CarrierPickupRequest(trackingNumber: trackingNumber)
-        return try await request(endpoint: "scan/carrier-pickup", method: "POST", body: body)
+        return try await request(endpoint: "scan/extras/carrier-pickup", method: "POST", body: body)
     }
 
     func confirmHomePickup(trackingNumber: String, senderPhone: String) async throws -> ScanResponse {
         let body = HomePickupConfirmRequest(trackingNumber: trackingNumber, senderPhone: senderPhone)
-        return try await request(endpoint: "scan/confirm-home-pickup", method: "POST", body: body)
+        return try await request(endpoint: "scan/extras/confirm-home-pickup", method: "POST", body: body)
     }
 
     // MARK: - Transporter Handoffs
@@ -229,7 +263,9 @@ final class APIService: @unchecked Sendable {
 
     // MARK: - Search
     func searchByPhone(_ phone: String) async throws -> [ShipmentDto] {
-        try await request(endpoint: "shipments/search/phone/\(phone)")
+        let trimmed = phone.trimmingCharacters(in: .whitespacesAndNewlines)
+        let escaped = trimmed.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? trimmed
+        return try await request(endpoint: "shipments/search/phone/\(escaped)")
     }
 
     // MARK: - Shipping Addresses (expéditeur)
@@ -240,6 +276,10 @@ final class APIService: @unchecked Sendable {
     // MARK: - Recipient Addresses (carnet d'adresses)
     func getRecipientAddresses() async throws -> [RecipientAddressDto] {
         try await request(endpoint: "recipient-addresses")
+    }
+
+    func createRecipientAddress(_ req: CreateRecipientAddressRequest) async throws -> RecipientAddressDto {
+        try await request(endpoint: "recipient-addresses", method: "POST", body: req)
     }
 }
 

@@ -60,5 +60,10 @@ export async function waitForPageContent(page: Page): Promise<void> {
  * Soumet un formulaire et attend la réponse (succès ou erreur visible).
  */
 export async function submitForm(page: Page, buttonLabel: RegExp | string): Promise<void> {
-  await page.getByRole('button', { name: buttonLabel }).click();
+  const formButton = page.locator('form').getByRole('button', { name: buttonLabel });
+  if (await formButton.count()) {
+    await formButton.first().click();
+    return;
+  }
+  await page.getByRole('button', { name: buttonLabel }).first().click();
 }

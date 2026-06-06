@@ -34,9 +34,8 @@ tap 109 2220; sleep 1
 tap 1000 150; sleep 2; shot "06_notifications.png"
 adb -s "$DEVICE" shell input keyevent 4; sleep 1
 
-adb -s "$DEVICE" shell input swipe 540 2000 540 700 600; sleep 1
-tap 540 1830; sleep 2; shot "07_tarifs.png"
-adb -s "$DEVICE" shell input keyevent 4; sleep 1
+adb -s "$DEVICE" shell input swipe 540 1400 540 700 400; sleep 1
+shot "07_services_rapides.png"
 
 # Profil → carnet / historique
 tap 972 2220; sleep 1
@@ -46,6 +45,20 @@ adb -s "$DEVICE" shell input keyevent 4; sleep 1
 tap 972 2220; sleep 1
 adb -s "$DEVICE" shell input swipe 540 1600 540 800 400; sleep 1
 tap 540 1150; sleep 2; shot "10_historique_paiements.png"
+adb -s "$DEVICE" shell input keyevent 4; sleep 1
+
+# Profil → infos / moyens / paramètres
+tap 972 2220; sleep 1
+adb -s "$DEVICE" shell input swipe 540 1600 540 700 500; sleep 1
+tap 540 920; sleep 2; shot "12_profil_edit.png"
+adb -s "$DEVICE" shell input keyevent 4; sleep 1
+tap 972 2220; sleep 1
+adb -s "$DEVICE" shell input swipe 540 1600 540 700 500; sleep 1
+tap 540 980; sleep 2; shot "13_moyens_paiement.png"
+adb -s "$DEVICE" shell input keyevent 4; sleep 1
+tap 972 2220; sleep 1
+adb -s "$DEVICE" shell input swipe 540 1600 540 700 500; sleep 1
+tap 540 1180; sleep 2; shot "14_parametres.png"
 adb -s "$DEVICE" shell input keyevent 4; sleep 1
 
 # Pas de colis E2E → capture liste vide (évite tap aléatoire hors app)

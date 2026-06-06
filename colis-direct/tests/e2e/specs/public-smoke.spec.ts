@@ -15,9 +15,10 @@ test.describe('Parcours publics staging', () => {
 
     await openHome(page);
 
-    await expect(page.getByRole('button', { name: /Créer un envoi/i }).first()).toBeVisible();
-    await expect(page.getByRole('button', { name: /Suivre un colis/i }).first()).toBeVisible();
-    await expect(page.getByRole('button', { name: /Connexion/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Envoyer un colis/i }).first()).toBeVisible();
+    await expect(page.getByRole('navigation').getByRole('button', { name: /Suivi de colis/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Se connecter/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /S'inscrire/i }).first()).toBeVisible();
 
     await expectNoCriticalBrowserIssues(diagnostics, testInfo);
   });
@@ -27,17 +28,18 @@ test.describe('Parcours publics staging', () => {
 
     await openHome(page);
 
-    await navigateWithHeader(page, /Tarifs/i);
-    await expect(page.getByRole('heading', { name: /Des tarifs simples et accessibles/i })).toBeVisible();
-
-    await navigateWithHeader(page, /Suivre un colis/i);
+    await navigateWithHeader(page, /Suivi de colis/i);
     await expect(page.getByRole('heading', { name: /Suivez votre colis/i })).toBeVisible();
 
-    await navigateWithHeader(page, /Comment ça marche/i);
-    await expect(page.getByRole('heading', { name: /Comment ça marche/i })).toBeVisible();
+    await navigateWithHeader(page, /Points relais/i);
+    await expect(page.getByRole('heading', { name: /Points relais/i })).toBeVisible();
 
     await navigateWithHeader(page, /À propos/i);
     await expect(page.getByRole('heading', { name: /À propos de COLISDIRECT/i })).toBeVisible();
+
+    await navigateWithHeader(page, /Accueil/i);
+    await page.getByRole('button', { name: /Voir tous les tarifs/i }).click();
+    await expect(page.getByRole('heading', { name: /Des tarifs simples et accessibles/i })).toBeVisible();
 
     await expectNoCriticalBrowserIssues(diagnostics, testInfo);
   });
@@ -46,8 +48,8 @@ test.describe('Parcours publics staging', () => {
     const diagnostics = collectBrowserDiagnostics(page);
 
     await openHome(page);
-    await navigateWithHeader(page, /Suivre un colis/i);
-    await page.getByRole('button', { name: /^Suivre$/i }).click();
+    await navigateWithHeader(page, /Suivi de colis/i);
+    await page.getByRole('button', { name: /Suivre mon colis/i }).first().click();
 
     await expect(page.getByText(/Veuillez entrer un numéro de suivi/i)).toBeVisible();
     await expectNoCriticalBrowserIssues(diagnostics, testInfo);
@@ -59,11 +61,11 @@ test.describe('Parcours publics staging', () => {
     const diagnostics = collectBrowserDiagnostics(page);
 
     await openHome(page);
-    await navigateWithHeader(page, /Suivre un colis/i);
+    await navigateWithHeader(page, /Suivi de colis/i);
     await page.getByPlaceholder(/Ex:/i).fill(e2e.knownTrackingNumber!);
-    await page.getByRole('button', { name: /^Suivre$/i }).click();
+    await page.getByRole('button', { name: /Suivre mon colis/i }).first().click();
 
-    await expect(page.getByRole('heading', { name: /Suivi de colis/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Suivi de colis|Suivez votre colis/i })).toBeVisible();
     await expectNoCriticalBrowserIssues(diagnostics, testInfo);
   });
 });

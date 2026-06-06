@@ -44,12 +44,12 @@ La maquette regroupe création / suivi sous **Envois** ; le natif a un onglet **
 
 | # | Maquette | Natif Kotlin | Écart principal |
 |---|----------|--------------|-----------------|
-| 1 | **Accueil** — hero « Envoyez et recevez… », image livreur, 2 CTA, grille 6 raccourcis, carte « Dernier envoi » | `MobileHomeScreen` — hero orange Capacitor, suivi rapide, services, partenaire, tarifs | **UI différente** : pas de hero gradient + image ; pas de grille 3×2 ; pas de carte dernier envoi dédiée en bas |
+| 1 | **Accueil** — hero « Envoyez et recevez… », image livreur, 2 CTA, grille 6 raccourcis, carte « Dernier envoi » | `MobileHomeScreen` — hero pêche, 2 CTA, grille 3×2, carte dernier envoi + sections partenaire/tarifs | **Proche** ; 5 onglets + FAB (maquette = 4 onglets) |
 | 2 | **Créer un envoi** — 4 modes, tailles, **catégorie**, villes départ/arrivée, destinataire (1 écran) | `CreateShipmentScreen` — **4 étapes** (infos, mode, relais, récap) | Fonctionnel proche ; maquette = 1 page ; **catégorie colis** absente du flux natif |
-| 3 | **Récapitulatif & prix** — trajet, lignes, **code promo**, total | Dernière étape de `CreateShipmentScreen` | Récap OK ; **code promo** non implémenté |
+| 3 | **Récapitulatif & prix** — trajet, lignes, **code promo**, total | Dernière étape de `CreateShipmentScreen` | Récap + **code promo** API |
 | 4 | **Suivi** — timeline verticale, statuts datés | `TrackingPublicScreen` + `ShipmentDetailScreen` | Proche ; polish timeline / détail à rapprocher de la maquette |
 | 5 | **Points relais** — carte + liste + fiche relais sélectionnée | `PublicRelayMapScreen` (OSM) | Proche fonctionnellement |
-| 6 | **Profil** — header **orange plein**, menu (infos, adresses, envois, **moyens de paiement**, notifs, **paramètres**) | `ClientProfileScreen` — header **navy**, cartes compte + menu (carnet, historique, tarifs, partenaire, CGU, support) | **Design profil différent** ; pas d’écrans **édition profil**, **moyens de paiement**, **paramètres** |
+| 6 | **Profil** — header **orange plein**, menu (infos, adresses, envois, **moyens de paiement**, notifs, **paramètres**) | `ClientProfileScreen` — header navy + `ProfileEditScreen` / paiement / paramètres | **Design header différent** ; écrans secondaires branchés |
 | 7 | **Espace livreur agréé** (aperçu) — toggle dispo, stats jour, liste courses/gains | Non : le livreur a une **app séparée** dans la maquette (voir §3) | Écran m7 = entrée marketing, pas l’implémentation métier actuelle |
 
 ---
@@ -63,7 +63,7 @@ La maquette regroupe création / suivi sous **Envois** ; le natif a un onglet **
 | 3 | Carte bancaire — formulaire carte | Via Paystack | Idem |
 | 4 | Confirmation succès — check + récap | Retour app après callback Paystack | **Écran succès dédié** manquant |
 
-À faire pour coller à la maquette : stack `PayMethodScreen` → `PayMobileMoneyScreen` / `PayCardScreen` → `PaySuccessScreen` (Compose), branchée après récap colis.
+Stack `PaymentMethodScreen` → `PayMobileMoneyScreen` / `PayCardScreen` → `PaySuccessScreen` branchée après création / détail colis.
 
 ---
 

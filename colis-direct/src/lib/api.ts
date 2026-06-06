@@ -3,12 +3,14 @@ export const API_URL = import.meta.env.VITE_API_URL || '/api';
 class ApiClient {
   private baseUrl: string;
   private token: string | null = null;
+  private refreshToken: string | null = null;
+  private refreshInFlight: Promise<boolean> | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
-    // Load token from localStorage
     if (typeof window !== 'undefined') {
       this.token = localStorage.getItem('auth_token');
+      this.refreshToken = localStorage.getItem('refresh_token');
     }
   }
 
@@ -21,9 +23,48 @@ class ApiClient {
     }
   }
 
+  setRefreshToken(token: string | null) {
+    this.refreshToken = token;
+    if (token && typeof window !== 'undefined') {
+      localStorage.setItem('refresh_token', token);
+    } else if (typeof window !== 'undefined') {
+      localStorage.removeItem('refresh_token');
+    }
+  }
+
+  private async tryRefreshAccessToken(): Promise<boolean> {
+    if (!this.refreshToken) return false;
+    if (this.refreshInFlight) return this.refreshInFlight;
+
+    this.refreshInFlight = (async () => {
+      try {
+        const res = await fetch(`${this.baseUrl}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: this.refreshToken }),
+        });
+        if (!res.ok) return false;
+        const json = await res.json();
+        if (json.token) {
+          this.setToken(json.token);
+          if (json.refresh_token) this.setRefreshToken(json.refresh_token);
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      } finally {
+        this.refreshInFlight = null;
+      }
+    })();
+
+    return this.refreshInFlight;
+  }
+
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    retried = false
   ): Promise<{ data: T | null; error: string | null }> {
     const url = `${this.baseUrl}${endpoint}`;
     const headers: HeadersInit = {
@@ -35,7 +76,6 @@ class ApiClient {
       (headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`;
     }
 
-    // Add timeout (10 seconds)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -56,11 +96,14 @@ class ApiClient {
       if (!isJson) {
         const text = await response.text();
         
-        // Handle 401 errors first - clear token immediately
+        if (response.status === 401 && !retried && endpoint !== '/auth/refresh') {
+          const refreshed = await this.tryRefreshAccessToken();
+          if (refreshed) return this.request<T>(endpoint, options, true);
+        }
         if (response.status === 401) {
           if (this.token) {
             this.setToken(null);
-            // Dispatch event to notify auth context
+            this.setRefreshToken(null);
             if (typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('auth:token-invalid'));
             }
@@ -97,12 +140,14 @@ class ApiClient {
       const json = await response.json();
 
       if (!response.ok) {
-        // Handle 401 errors gracefully (user not authenticated)
+        if (response.status === 401 && !retried && endpoint !== '/auth/refresh') {
+          const refreshed = await this.tryRefreshAccessToken();
+          if (refreshed) return this.request<T>(endpoint, options, true);
+        }
         if (response.status === 401) {
-          // Clear token if it's invalid
           if (this.token) {
             this.setToken(null);
-            // Dispatch event to notify auth context
+            this.setRefreshToken(null);
             if (typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('auth:token-invalid'));
             }
@@ -214,8 +259,8 @@ class ApiClient {
     });
 
     if (data && (data as any).token) {
-      const token = (data as any).token;
-      this.setToken(token);
+      this.setToken((data as any).token);
+      if ((data as any).refresh_token) this.setRefreshToken((data as any).refresh_token);
       return { data: (data as any).user, error: null };
     }
 
@@ -223,14 +268,14 @@ class ApiClient {
   }
 
   async signUp(email: string, password: string, userData: any) {
-    const { data, error } = await this.request<{ user: any; token: string }>('/auth/signup', {
+    const { data, error } = await this.request<{ user: any; token: string; refresh_token?: string }>('/auth/signup', {
       method: 'POST',
       body: JSON.stringify({ email, password, ...userData }),
     });
 
     if (data && (data as any).token) {
-      const token = (data as any).token;
-      this.setToken(token);
+      this.setToken((data as any).token);
+      if ((data as any).refresh_token) this.setRefreshToken((data as any).refresh_token);
       return { data: (data as any).user, error: null };
     }
 
@@ -240,6 +285,7 @@ class ApiClient {
   async signOut() {
     await this.request('/auth/signout', { method: 'POST' });
     this.setToken(null);
+    this.setRefreshToken(null);
   }
 
   async getCurrentUser() {

@@ -114,7 +114,7 @@ struct ShipmentDetailView: View {
                 infoCell(label: "Format", value: packageSizeLabel(shipment.packageSize))
                 infoCell(label: "Poids", value: shipment.weight.map { "\(String(format: "%.1f", $0)) kg" } ?? "—")
                 infoCell(label: "Mode", value: deliveryModeLabel(shipment.deliveryMode))
-                infoCell(label: "Prix", value: shipment.price.map { "\(Int($0)) FCFA" } ?? "—", accent: true)
+                infoCell(label: "Prix", value: "\(Int(shipment.totalAmount)) FCFA", accent: true)
             }
         }
         .cardStyle()
@@ -123,7 +123,7 @@ struct ShipmentDetailView: View {
     private var actionsSection: some View {
         VStack(spacing: 10) {
             // Cancel (only for certain statuses)
-            let canCancel = ["READY_FOR_DROP_OFF", "PAYMENT_AWAITING_VALIDATION", "PICKUP_PENDING"]
+            let canCancel = ["READY_FOR_DROP_OFF", "PICKUP_PENDING", "PENDING"]
                 .contains(shipment.currentStatus?.uppercased() ?? "")
 
             if canCancel {

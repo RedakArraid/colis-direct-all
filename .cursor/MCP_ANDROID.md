@@ -86,6 +86,7 @@ Si l’accueil client affiche « Reconnectez-vous… » pour un staff : réinsta
 | MCP gris / erreur | Vérifier Node 22+ (`node -v`), relancer Cursor |
 | `adb` introuvable | Installer Android SDK Platform-Tools, vérifier `ANDROID_HOME` dans `mcp.json` |
 | Aucun device | Démarrer un AVD dans Android Studio ou brancher un téléphone (USB debug) |
+| `redirect.txt` sous `.../debug/...` | Variant IDE = **devDebug**, pas `debug` ; `./scripts/build-dev.sh` puis Sync Gradle |
 
 ### MCP pas vert (Cursor)
 

@@ -7,11 +7,43 @@ const MAX_OFFER_ROUNDS = 5; // Nombre max de livreurs à contacter avant alerte 
  * Sélectionne les meilleurs livreurs disponibles pour un colis
  * et crée les offres de course en cascade.
  */
+/** Zone de dispatch : relais d'origine, ou commune expéditeur (home_pickup). */
+async function resolveDispatchZoneId(shipment: {
+  origin_relay_id?: string | null;
+  pickup_method?: string | null;
+  sender_commune?: string | null;
+  home_delivery?: boolean | null;
+  recipient_commune?: string | null;
+  destination_relay_id?: string | null;
+}): Promise<string | null> {
+  if (shipment.origin_relay_id) {
+    const rp = await pool.query('SELECT zone_id FROM relay_points WHERE id = $1', [shipment.origin_relay_id]);
+    if (rp.rows[0]?.zone_id) return rp.rows[0].zone_id;
+  }
+  const commune =
+    shipment.pickup_method === 'home_pickup'
+      ? shipment.sender_commune
+      : shipment.home_delivery
+        ? shipment.recipient_commune
+        : null;
+  if (commune) {
+    const dz = await pool.query(
+      `SELECT id FROM delivery_zones WHERE $1 = ANY(communes) AND is_active = true LIMIT 1`,
+      [commune]
+    );
+    if (dz.rows[0]?.id) return dz.rows[0].id;
+  }
+  if (shipment.destination_relay_id) {
+    const rp = await pool.query('SELECT zone_id FROM relay_points WHERE id = $1', [shipment.destination_relay_id]);
+    if (rp.rows[0]?.zone_id) return rp.rows[0].zone_id;
+  }
+  return null;
+}
+
 async function dispatchShipment(shipmentId: string): Promise<void> {
   const shipmentRes = await pool.query(
-    `SELECT s.*, rp.zone_id AS origin_zone_id
+    `SELECT s.*
      FROM shipments s
-     LEFT JOIN relay_points rp ON rp.id = s.origin_relay_id
      WHERE s.id = $1`,
     [shipmentId]
   );
@@ -21,6 +53,7 @@ async function dispatchShipment(shipmentId: string): Promise<void> {
   }
 
   const shipment = shipmentRes.rows[0];
+  const originZoneId = await resolveDispatchZoneId(shipment);
 
   // Vérifier qu'il n'y a pas déjà une offre active ou un livreur assigné
   const existingOfferRes = await pool.query(
@@ -37,13 +70,13 @@ async function dispatchShipment(shipmentId: string): Promise<void> {
     return;
   }
 
-  await continueDispatch(shipmentId, 1);
+  await continueDispatch(shipmentId, 1, originZoneId);
 }
 
 /**
  * Envoie la prochaine offre dans la cascade (round N)
  */
-async function continueDispatch(shipmentId: string, round: number): Promise<void> {
+async function continueDispatch(shipmentId: string, round: number, originZoneId?: string | null): Promise<void> {
   if (round > MAX_OFFER_ROUNDS) {
     // Alerte admin : aucun livreur disponible
     await createAdminAlert(shipmentId);
@@ -57,16 +90,11 @@ async function continueDispatch(shipmentId: string, round: number): Promise<void
   );
   const alreadyContacted = contactedRes.rows.map((r: any) => r.transporter_id);
 
-  const shipmentRes = await pool.query(
-    `SELECT s.*, rp.zone_id AS origin_zone_id
-     FROM shipments s
-     LEFT JOIN relay_points rp ON rp.id = s.origin_relay_id
-     WHERE s.id = $1`,
-    [shipmentId]
-  );
+  const shipmentRes = await pool.query(`SELECT s.* FROM shipments s WHERE s.id = $1`, [shipmentId]);
 
   if (shipmentRes.rows.length === 0) return;
   const shipment = shipmentRes.rows[0];
+  const zoneId = originZoneId ?? (await resolveDispatchZoneId(shipment));
 
   // Trouver le meilleur livreur disponible non encore contacté
   const candidatesRes = await pool.query(
@@ -88,7 +116,7 @@ async function continueDispatch(shipmentId: string, round: number): Promise<void
      ORDER BY zone_priority ASC, load_score ASC, t.updated_at ASC
      LIMIT 1`,
     [
-      shipment.origin_zone_id || null,
+      zoneId || null,
       alreadyContacted.length > 0 ? alreadyContacted : ['00000000-0000-0000-0000-000000000000'],
     ]
   );
@@ -141,7 +169,7 @@ async function processExpiredOffers(): Promise<void> {
     if (shipmentCheck.rows[0]?.transporter_id) continue;
 
     // Continuer la cascade vers le prochain livreur
-    continueDispatch(expired.shipment_id, expired.offer_round + 1).catch((err) =>
+    continueDispatch(expired.shipment_id, expired.offer_round + 1, undefined).catch((err) =>
       console.error('Continue dispatch error:', err)
     );
   }

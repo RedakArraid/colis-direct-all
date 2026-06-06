@@ -6,6 +6,7 @@ loadE2EEnv();
 const e2e = getE2EConfig();
 
 export default defineConfig({
+  globalSetup: './tests/e2e/global-setup.ts',
   testDir: './tests/e2e/specs',
   timeout: 45_000,
   expect: {
@@ -24,7 +25,7 @@ export default defineConfig({
     ignoreHTTPSErrors: e2e.ignoreHTTPSErrors,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    video: process.env.CI ? 'retain-on-failure' : 'off',
     actionTimeout: 10_000,
     navigationTimeout: 25_000,
     locale: 'fr-FR',

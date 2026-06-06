@@ -26,11 +26,16 @@ struct ShipmentsListView: View {
             list = list.filter { shipment in
                 guard let status = shipment.currentStatus?.uppercased() else { return false }
                 if s == "in_transit" {
-                    return status == "IN_TRANSIT" || status == "CARRIER_COLLECTED"
+                    // "En cours" includes any status that is not a terminal state (Delivered, Cancelled, or Returned)
+                    return status != "DELIVERED" &&
+                           status != "DELIVERED_TO_CUSTOMER" &&
+                           status != "PICKED_UP_BY_CUSTOMER" &&
+                           status != "CANCELLED" &&
+                           status != "RETURN_TO_SENDER"
                 } else if s == "delivered" {
                     return status == "DELIVERED" || status == "DELIVERED_TO_CUSTOMER" || status == "PICKED_UP_BY_CUSTOMER"
                 } else if s == "cancelled" {
-                    return status == "CANCELLED"
+                    return status == "CANCELLED" || status == "RETURN_TO_SENDER"
                 }
                 return status.lowercased() == s
             }
@@ -96,9 +101,6 @@ struct ShipmentsListView: View {
                         ForEach(statusFilters, id: \.label) { filter in
                             Button(action: {
                                 selectedStatus = filter.value
-                                Task {
-                                    await vm.loadShipments()
-                                }
                             }) {
                                 Text(filter.label)
                                     .font(AppFont.semiBold(13))

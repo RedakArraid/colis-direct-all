@@ -2,6 +2,7 @@ package ci.colisdirect.app.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import ci.colisdirect.app.data.api.model.UpdateUserRequest
 import ci.colisdirect.app.data.api.model.UserDto
 import ci.colisdirect.app.data.local.TokenManager
 import ci.colisdirect.app.data.repository.AuthRepository
@@ -90,6 +91,49 @@ class AuthViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    fun updateProfile(
+        firstName: String,
+        lastName: String,
+        phone: String,
+        commune: String,
+        onComplete: (Boolean) -> Unit = {},
+    ) {
+        val userId = _uiState.value.user?.id ?: run {
+            onComplete(false)
+            return
+        }
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            when (
+                val result = authRepository.updateUser(
+                    userId,
+                    UpdateUserRequest(
+                        firstName = firstName.trim(),
+                        lastName = lastName.trim(),
+                        phone = phone.trim().ifBlank { null },
+                        commune = commune.trim().ifBlank { null },
+                    ),
+                )
+            ) {
+                is AuthResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        user = result.data,
+                        isLoggedIn = true,
+                    )
+                    onComplete(true)
+                }
+                is AuthResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = result.message,
+                    )
+                    onComplete(false)
+                }
+            }
+        }
     }
 
     fun getCurrentRole(): String? = authRepository.getCurrentRole()

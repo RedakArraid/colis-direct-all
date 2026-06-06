@@ -16,6 +16,7 @@ import ci.colisdirect.app.data.api.model.CreateRecipientAddressRequest
 import ci.colisdirect.app.data.repository.RecipientAddressRepository
 import ci.colisdirect.app.data.repository.ShipmentRepository
 import ci.colisdirect.app.domain.PricingHelper
+import ci.colisdirect.app.domain.PromoDiscount
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -206,6 +207,9 @@ class ClientViewModel @Inject constructor(
             }
         }
     }
+
+    suspend fun validatePromoCode(code: String): ApiResult<PromoDiscount.Validated> =
+        shipmentRepo.validatePromoCode(code)
 
     fun createShipment(
         request: CreateShipmentRequest,

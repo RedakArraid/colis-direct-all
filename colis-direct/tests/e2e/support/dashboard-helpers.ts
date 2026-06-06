@@ -2,6 +2,7 @@ import { expect, type Page } from '@playwright/test';
 import { loginWithEmail } from './auth';
 import { waitForPageContent } from './form-helpers';
 import { getRoleCredentials, getRoleUserId, type E2ERole, getE2EConfig } from './env';
+import { getCachedAuth } from './token-cache';
 
 /** Mapping E2ERole → rôle applicatif réel (utilisé dans le JWT et pour vérifier /auth/me). */
 const APP_ROLE: Record<E2ERole, string> = {
@@ -20,8 +21,14 @@ export async function loginAndOpenDashboard(page: Page, role: E2ERole): Promise<
   const credentials = getRoleCredentials(role);
   if (!credentials) return false;
 
-  const userId = getRoleUserId(role);
-  await loginWithEmail(page, credentials, { id: userId, role: APP_ROLE[role] });
+  const authMode = process.env.E2E_AUTH_MODE || 'api';
+  const envUserId = process.env[`E2E_${role.toUpperCase()}_USER_ID`];
+  const cachedUserId = getCachedAuth(credentials.email)?.user_id;
+  const identity =
+    authMode === 'jwt'
+      ? { id: envUserId || cachedUserId || getRoleUserId(role), role: APP_ROLE[role] }
+      : undefined;
+  await loginWithEmail(page, credentials, identity);
   await waitForPageContent(page);
   return true;
 }

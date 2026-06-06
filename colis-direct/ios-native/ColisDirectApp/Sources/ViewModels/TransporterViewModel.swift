@@ -101,11 +101,11 @@ final class RelayViewModel: ObservableObject {
         isLoading = false
     }
 
-    func completeDelivery(trackingNumber: String, recipientPhone: String) async {
+    func completeDelivery(trackingNumber: String, pickupCode: String, recipientIdentifier: String? = nil) async {
         isLoading = true
         error = nil
         do {
-            let resp = try await api.completeDelivery(trackingNumber: trackingNumber, recipientPhone: recipientPhone)
+            let resp = try await api.completeDelivery(trackingNumber: trackingNumber, pickupCode: pickupCode, recipientIdentifier: recipientIdentifier)
             scanResult = resp
             lastScannedShipment = resp.shipment
             await loadPendingShipments()

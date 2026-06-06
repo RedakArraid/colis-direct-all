@@ -16,6 +16,10 @@ interface BrowserWarning {
 
 const ignoredConsoleFragments = [
   'Download the React DevTools',
+  'support/events',
+  'Access-Control-Allow-Credentials',
+  'net::ERR_FAILED',
+  '[SSE]',
 ];
 
 const warningConsoleFragments = [

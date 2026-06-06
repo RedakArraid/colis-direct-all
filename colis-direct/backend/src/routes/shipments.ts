@@ -8,6 +8,8 @@ import { processScanBypassFromRole } from '../lib/processScanBypass';
 import { SQL_READY_FOR_CARRIER_PICKUP } from '../lib/readyForCarrierPickup';
 import dispatchService from '../services/dispatchService';
 import { computePricing, deriveModeKey, resolvePackageSize, finalPriceForMode, type PackageSize } from '../services/pricingService';
+import { validateBody } from '../middleware/validate';
+import { createShipmentSchema } from '../schemas/shipmentSchemas';
 
 const router = express.Router();
 
@@ -101,6 +103,11 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
     }
 
     query += ' ORDER BY s.created_at DESC';
+
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit || '50'), 10) || 50, 1), 200);
+    const offset = Math.max(parseInt(String(req.query.offset || '0'), 10) || 0, 0);
+    query += ` LIMIT $${++paramCount} OFFSET $${++paramCount}`;
+    params.push(limit, offset);
 
     const result = await pool.query(query, params);
     res.json(result.rows);
@@ -343,7 +350,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
 });
 
 // Create shipment
-router.post('/', async (req: any, res) => {
+router.post('/', validateBody(createShipmentSchema), async (req: any, res) => {
   try {
     // Try to get user from token (optional for guest checkout)
     let userId = null;
@@ -393,6 +400,8 @@ router.post('/', async (req: any, res) => {
       destination_relay_id,
       promo_code,
       grid_type,
+      sender_latitude,
+      sender_longitude,
     } = req.body;
 
     // Générer le tracking_number côté serveur si non fourni (évite les collisions frontend)
@@ -491,8 +500,9 @@ router.post('/', async (req: any, res) => {
           package_type, weight, price, current_status, printing_fee, assistance_fee, box_price,
           print_at_relay, relay_assisted, home_delivery, pickup_code, shipment_code,
           payment_status, payment_method, pickup_method,
-          origin_relay_id, destination_relay_id, created_by, promo_code
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36)
+          origin_relay_id, destination_relay_id, created_by, promo_code,
+          sender_latitude, sender_longitude
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38)
         RETURNING *`,
         [
           finalTrackingNumber,
@@ -511,6 +521,8 @@ router.post('/', async (req: any, res) => {
           finalOriginRelayId, destination_relay_id || null,
           userId || null,
           promo_code ? promo_code.trim() : null,
+          sender_latitude != null && Number.isFinite(Number(sender_latitude)) ? Number(sender_latitude) : null,
+          sender_longitude != null && Number.isFinite(Number(sender_longitude)) ? Number(sender_longitude) : null,
         ]
       );
 
@@ -565,17 +577,19 @@ router.post('/', async (req: any, res) => {
       String(newShipment.payment_status || '').toLowerCase() !== 'paid';
     const deferDispatchToPayment = pickup_method === 'home_pickup' && awaitingOnlinePayment;
 
-    // Auto-assign to best transporter if origin_relay_id exists OR if home_pickup (ramassage à domicile)
-    // Pour les colis avec home_pickup, on peut aussi assigner automatiquement si une zone de livraison correspond
-    if (newShipment.origin_relay_id || pickup_method === 'home_pickup') {
+    // home_pickup : dispatch marketplace uniquement (offres acceptées par le livreur, style Uber).
+    // relay_deposit : auto-assign classique + dispatch marketplace en secours.
+    if (pickup_method === 'home_pickup') {
+      if (!deferDispatchToPayment) {
+        dispatchService.dispatchShipment(newShipment.id).catch((err: any) =>
+          console.error('Home pickup dispatch error:', err.message)
+        );
+      }
+    } else if (newShipment.origin_relay_id) {
       try {
-        const assignResult = await pool.query('SELECT assign_shipment_to_transporter($1) as transporter_id', [newShipment.id]);
-        assignResult.rows[0]?.transporter_id; // auto-assign result, not used further
-        // Reload shipment to get updated transporter_id
+        await pool.query('SELECT assign_shipment_to_transporter($1) as transporter_id', [newShipment.id]);
         const updatedResult = await pool.query('SELECT * FROM shipments WHERE id = $1', [newShipment.id]);
         if (updatedResult.rows.length > 0) {
-          // ─── Dispatch Marketplace (non-bloquant) ─────────────────────────
-          // Tenter le dispatch marketplace en parallèle (offre aux livreurs indépendants)
           if (!deferDispatchToPayment) {
             dispatchService.dispatchShipment(newShipment.id).catch((err: any) =>
               console.error('Marketplace dispatch error (after assign):', err.message)
@@ -585,13 +599,13 @@ router.post('/', async (req: any, res) => {
         }
       } catch (assignError: any) {
         console.error('Auto-assignment failed, shipment created without transporter:', assignError.message);
-        console.error('Error details:', assignError);
-        // Continue - shipment is created but not assigned yet
       }
-    }
-
-    // ─── Dispatch Marketplace pour tous les colis (non-bloquant) ─────────────
-    if (!deferDispatchToPayment) {
+      if (!deferDispatchToPayment) {
+        dispatchService.dispatchShipment(newShipment.id).catch((err: any) =>
+          console.error('Marketplace dispatch error:', err.message)
+        );
+      }
+    } else if (!deferDispatchToPayment) {
       dispatchService.dispatchShipment(newShipment.id).catch((err: any) =>
         console.error('Marketplace dispatch error:', err.message)
       );

@@ -54,8 +54,9 @@ Voir aussi `local.properties.example`.
 
 ## Écarts connus (non bloquants store si acceptés produit)
 
-- Maquette UI : hero accueil, profil (moyens paiement, paramètres), code promo
-- Paiement : UI maquette + redirect Paystack (pas API OM/MTN natives)
-- App livreur : shell « courses » branché sur API logistique existante
+- Maquette UI : catégorie colis (création), header profil orange plein, opérateurs OM/MTN/Wave séparés
+- Paiement : redirect Paystack (pas API OM/MTN natives) — écrans Compose `PayMethod` → `PaySuccess` branchés
+- Client pro (`is_pro`) : pas de `ProDashboard` natif (espace client standard + web)
+- Notifications push : interrupteur désactivé (FCM à venir)
 
 *Mis à jour : juin 2026*

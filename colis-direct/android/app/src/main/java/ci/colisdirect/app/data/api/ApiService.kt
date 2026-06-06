@@ -17,6 +17,12 @@ interface ApiService {
     @GET("auth/me")
     suspend fun getMe(): Response<MeResponse>
 
+    @PATCH("users/{id}")
+    suspend fun updateUser(
+        @Path("id") id: String,
+        @Body request: UpdateUserRequest,
+    ): Response<UserDto>
+
     @POST("auth/signout")
     suspend fun signOut(): Response<SuccessResponse>
 
@@ -34,6 +40,9 @@ interface ApiService {
 
     @POST("shipments")
     suspend fun createShipment(@Body request: CreateShipmentRequest): Response<ShipmentDto>
+
+    @POST("promo-codes/validate")
+    suspend fun validatePromoCode(@Body request: PromoValidateRequest): Response<PromoValidateEnvelope>
 
     @GET("shipments/search/phone/{phone}")
     suspend fun searchByPhone(@Path("phone") phone: String): Response<List<ShipmentDto>>

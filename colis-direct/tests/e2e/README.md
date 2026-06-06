@@ -29,19 +29,43 @@ Ne pas les ajouter dans Git, dans les docs ou dans les tickets.
 
 ## Authentification des tests
 
-Deux modes existent :
+Trois mecanismes coexistent :
 
-- `E2E_AUTH_MODE=api` : appelle `/auth/signin`. Utile pour tester le formulaire/login API, mais sensible au rate limiter.
-- `E2E_AUTH_MODE=jwt` : genere un token localement avec `E2E_JWT_SECRET` et les `E2E_*_USER_ID`.
+1. **Cache global-setup** (defaut) : au demarrage, 5 connexions `/auth/signin` (une par role) sont
+   mises en cache dans `tests/e2e/.auth-tokens.json`. Les tests suivants reutilisent ces tokens sans
+   rappeler l'API.
+2. **`E2E_AUTH_MODE=jwt`** : genere un token localement avec `E2E_JWT_SECRET` et les `E2E_*_USER_ID`
+   (zero appel `/auth/signin`).
+3. **`E2E_RATE_LIMIT_BYPASS_KEY`** : si la meme valeur est configuree sur staging-api
+   (`E2E_RATE_LIMIT_BYPASS_KEY`), les tests envoient `x-e2e-bypass-key` pour eviter le rate limiter
+   429 sur `/auth/signin`.
 
-Pour les runs frequents contre staging, preferer `jwt` afin de ne pas bloquer les comptes avec
-`Trop de tentatives`. Le secret JWT et les IDs utilisateurs restent uniquement dans `.env.e2e.local`.
+Pour les runs frequents contre staging, preferer `jwt` ou le cache + bypass deploye.
+Les IDs admin/support connus sont documentes dans `.env.e2e.example`.
 
 ## Lancer les tests
 
 ```bash
 npm run test:e2e:staging
 ```
+
+### Dispatch domicile (home_pickup)
+
+Tests API sans navigateur (staging) :
+
+```bash
+npm run test:e2e:dispatch
+```
+
+Test API local (backend sur `localhost:3001`) :
+
+```bash
+npm run test:api:home-pickup
+# ou : node scripts/test-home-pickup-api.mjs http://localhost:3001/api
+```
+
+> Sur staging, l'endpoint `/api/tracking/:tn/dispatch-status` n'est actif qu'après déploiement de la branche `dev`.
+> Les tests API passent quand même (création colis + offres transporteur).
 
 Rapport HTML :
 

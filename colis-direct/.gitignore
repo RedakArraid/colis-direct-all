@@ -64,6 +64,7 @@ coverage/
 playwright-report/
 test-results/
 tests/e2e/.auth/
+tests/e2e/.auth-tokens.json
 
 # Claude Code
 .claude/

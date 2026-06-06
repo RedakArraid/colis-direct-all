@@ -17,26 +17,32 @@ struct CreateShipmentView: View {
     @State private var senderName = ""
     @State private var senderPhone = ""
     @State private var senderCommune = ""
+    @State private var senderQuartier = ""
+    @State private var senderAddress = ""
     @State private var senderEditing = false
+    @State private var selectedShippingAddressId: String? = nil
 
     // Recipient fields
     @State private var recipientName = ""
     @State private var recipientPhone = ""
     @State private var recipientCommune = ""
+    @State private var recipientQuartier = ""
+    @State private var recipientAddress = ""
     @State private var showAddressBook = false
+    @State private var saveRecipientToAddressBook = false
 
     // Package fields
-    @State private var packageSize = "medium"
+    @State private var packageSize = "moyen"
     @State private var weight = 1.0
     @State private var deliveryMode = "relay_to_relay"
     @State private var paymentMethod = "relay_cash"
-    @State private var selectedPickupRelayId: String? = nil
     @State private var selectedDeliveryRelayId: String? = nil
 
     // Address data loaded from API
     @State private var shippingAddresses: [ShippingAddressDto] = []
     @State private var recipientAddresses: [RecipientAddressDto] = []
     @State private var loadingAddresses = false
+    @State private var createdShipment: ShipmentDto? = nil
 
     let communes = ["Abidjan", "Cocody", "Plateau", "Marcory", "Treichville", "Adjamé",
                     "Yopougon", "Abobo", "Bouaké", "San-Pédro", "Daloa", "Yamoussoukro",
@@ -79,10 +85,12 @@ struct CreateShipmentView: View {
     var canProceed: Bool {
         switch currentFormStep {
         case .sender:
-            return !senderName.isEmpty && !senderPhone.isEmpty && !senderCommune.isEmpty
+            return !senderName.isEmpty && !senderPhone.isEmpty && !senderCommune.isEmpty && !senderQuartier.isEmpty && !senderAddress.isEmpty
         case .recipient:
-            return !recipientName.isEmpty && !recipientPhone.isEmpty && !recipientCommune.isEmpty
+            return !recipientName.isEmpty && !recipientPhone.isEmpty && !recipientCommune.isEmpty && !recipientQuartier.isEmpty && !recipientAddress.isEmpty
         case .package:
+            let needsDelivery = (deliveryMode == "relay_to_relay" || deliveryMode == "home_to_relay")
+            if needsDelivery && selectedDeliveryRelayId == nil { return false }
             return true
         case .confirmation:
             return true
@@ -160,10 +168,38 @@ struct CreateShipmentView: View {
             .task {
                 await relayVM.load()
                 await loadAddresses()
+                updateDefaultRelaySelection()
+                recalculatePrice()
+            }
+            .onChange(of: packageSize) { _ in recalculatePrice() }
+            .onChange(of: weight) { _ in recalculatePrice() }
+            .onChange(of: senderCommune) { _ in
+                updateDefaultRelaySelection()
+                recalculatePrice()
+            }
+            .onChange(of: recipientCommune) { _ in
+                updateDefaultRelaySelection()
+                recalculatePrice()
+            }
+            .onChange(of: deliveryMode) { newMode in
+                let needsDelivery = (newMode == "relay_to_relay" || newMode == "home_to_relay")
+                if needsDelivery {
+                    let filtered = relayVM.relayPoints.filter { $0.commune?.lowercased() == recipientCommune.lowercased() }
+                    selectedDeliveryRelayId = filtered.first?.id ?? relayVM.relayPoints.first?.id
+                } else {
+                    selectedDeliveryRelayId = nil
+                }
+                recalculatePrice()
             }
         }
         .sheet(isPresented: $showAddressBook) {
             addressBookSheet
+        }
+        .sheet(item: $createdShipment) { shipment in
+            PaymentFlowView(shipment: shipment, user: user, vm: vm)
+                .onDisappear {
+                    dismiss()
+                }
         }
     }
 
@@ -187,14 +223,23 @@ struct CreateShipmentView: View {
         guard let u = user else { return }
         if senderName.isEmpty { senderName = u.fullName }
         if senderPhone.isEmpty { senderPhone = u.phone ?? "" }
-        // Auto-fill commune from default shipping address
+        // Auto-fill address from default shipping address
         if senderCommune.isEmpty {
             if let addr = defaultShippingAddress, let c = addr.commune, !c.isEmpty {
                 senderCommune = c
+                senderQuartier = addr.quartier ?? ""
+                senderAddress = addr.address ?? ""
+                selectedShippingAddressId = addr.id
             } else if let firstAddr = shippingAddresses.first, let c = firstAddr.commune, !c.isEmpty {
                 senderCommune = c
+                senderQuartier = firstAddr.quartier ?? ""
+                senderAddress = firstAddr.address ?? ""
+                selectedShippingAddressId = firstAddr.id
             } else {
                 senderCommune = "Abidjan" // Default fallback commune de départ
+                senderQuartier = ""
+                senderAddress = ""
+                selectedShippingAddressId = nil
             }
         }
     }
@@ -280,6 +325,9 @@ struct CreateShipmentView: View {
                 CdTextField(label: "Téléphone", text: $senderPhone, placeholder: "07 XX XX XX XX",
                             leadingIcon: "phone.fill", keyboardType: .phonePad)
                 communePicker(label: "Commune de départ", value: $senderCommune)
+                CdTextField(label: "Quartier de départ", text: $senderQuartier, placeholder: "Ex: Cocody Centre")
+                CdTextField(label: "Adresse précise", text: $senderAddress, placeholder: "Ex: Rue des Jardins, en face de la pharmacie")
+                
                 if user != nil {
                     Button(action: { senderEditing = false; prefillSender() }) {
                         HStack(spacing: 6) {
@@ -301,8 +349,13 @@ struct CreateShipmentView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(shippingAddresses) { addr in
-                        let selected = addr.commune == senderCommune
-                        Button(action: { senderCommune = addr.commune ?? senderCommune }) {
+                        let selected = selectedShippingAddressId == addr.id
+                        Button(action: {
+                            senderCommune = addr.commune ?? ""
+                            senderQuartier = addr.quartier ?? ""
+                            senderAddress = addr.address ?? ""
+                            selectedShippingAddressId = addr.id
+                        }) {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(addr.commune ?? "—")
                                     .font(AppFont.semiBold(13))
@@ -365,6 +418,18 @@ struct CreateShipmentView: View {
             CdTextField(label: "Téléphone", text: $recipientPhone, placeholder: "05 XX XX XX XX",
                         leadingIcon: "phone.fill", keyboardType: .phonePad)
             communePicker(label: "Commune d'arrivée", value: $recipientCommune)
+            CdTextField(label: "Quartier d'arrivée", text: $recipientQuartier, placeholder: "Ex: Angré Oscars")
+            CdTextField(label: "Adresse précise", text: $recipientAddress, placeholder: "Ex: En face de la pharmacie principale")
+
+            if user != nil {
+                Toggle(isOn: $saveRecipientToAddressBook) {
+                    Text("Ajouter ce destinataire à mon carnet d'adresses")
+                        .font(AppFont.regular(13))
+                        .foregroundColor(.gray900)
+                }
+                .tint(.orangePrimary)
+                .padding(.top, 4)
+            }
         }
     }
 
@@ -377,7 +442,7 @@ struct CreateShipmentView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Format du colis").font(AppFont.medium(13)).foregroundColor(.gray900)
                 HStack(spacing: 8) {
-                    ForEach([("Petit", "small"), ("Moyen", "medium"), ("Grand", "large")], id: \.0) { label, value in
+                    ForEach([("Petit", "petit"), ("Moyen", "moyen"), ("Grand", "grand")], id: \.0) { label, value in
                         Button(action: { packageSize = value }) {
                             Text(label)
                                 .font(AppFont.semiBold(13))
@@ -407,41 +472,156 @@ struct CreateShipmentView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Mode de livraison").font(AppFont.medium(13)).foregroundColor(.gray900)
-                VStack(spacing: 8) {
+                
+                if pricingVM.isLoading {
+                    HStack(spacing: 8) {
+                        ProgressView().tint(.orangePrimary)
+                        Text("Calcul des tarifs…").font(AppFont.medium(14)).foregroundColor(.gray500)
+                    }
+                    .padding(.vertical, 8)
+                } else if let errorMsg = pricingVM.error {
+                    Text(errorMsg)
+                        .font(AppFont.regular(12))
+                        .foregroundColor(.red)
+                        .padding(.vertical, 4)
+                }
+                
+                VStack(spacing: 10) {
                     ForEach([
                         ("relay_to_relay", "Relais → Relais", "storefront.fill", Color.purpleRelay),
                         ("home_to_relay", "Dom. → Relais", "house.fill", Color.blueInfo),
                         ("relay_to_home", "Relais → Dom.", "house.fill", Color.greenSuccess),
+                        ("home_to_home", "Dom. → Dom.", "house.fill", Color.orangePrimary),
                     ], id: \.0) { value, label, icon, color in
-                        Button(action: { deliveryMode = value }) {
-                            HStack(spacing: 10) {
-                                Image(systemName: icon).foregroundColor(color)
-                                Text(label).font(AppFont.medium(14)).foregroundColor(.gray900)
-                                Spacer()
-                                if deliveryMode == value {
-                                    Image(systemName: "checkmark.circle.fill").foregroundColor(.orangePrimary)
+                        let pricingResultMode = pricingVM.result?.modes.first(where: { $0.key == value })
+                        let isAvailable = pricingResultMode?.available ?? true
+                        
+                        // Hide home_to_home if not returned in modes list (distance > 50km)
+                        if value != "home_to_home" || pricingVM.result?.modes.contains(where: { $0.key == "home_to_home" }) == true {
+                            Button(action: {
+                                if isAvailable {
+                                    deliveryMode = value
+                                }
+                            }) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: icon)
+                                        .font(.system(size: 18))
+                                        .foregroundColor(isAvailable ? color : .gray300)
+                                        .frame(width: 24)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(label)
+                                            .font(AppFont.medium(14))
+                                            .foregroundColor(isAvailable ? .gray900 : .gray400)
+                                        
+                                        if let delay = pricingResultMode?.delay {
+                                            Text(delay)
+                                                .font(AppFont.regular(11))
+                                                .foregroundColor(.gray400)
+                                        }
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    if let modePrice = pricingResultMode {
+                                        VStack(alignment: .trailing, spacing: 2) {
+                                            HStack(spacing: 4) {
+                                                Text("\(Int(modePrice.finalPriceFcfa))")
+                                                    .font(AppFont.extraBold(16))
+                                                    .foregroundColor(isAvailable ? (deliveryMode == value ? .orangePrimary : .gray900) : .gray400)
+                                                Text("FCFA")
+                                                    .font(AppFont.medium(10))
+                                                    .foregroundColor(isAvailable ? .gray500 : .gray400)
+                                            }
+                                            
+                                            if modePrice.discountPercent > 0 {
+                                                HStack(spacing: 4) {
+                                                    Text("\(Int(modePrice.standardPriceFcfa))")
+                                                        .font(AppFont.regular(11))
+                                                        .foregroundColor(.gray400)
+                                                        .strikethrough()
+                                                    Text("-\(Int(modePrice.discountPercent))%")
+                                                        .font(AppFont.bold(10))
+                                                        .foregroundColor(.greenSuccess)
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        Text("—")
+                                            .font(AppFont.medium(14))
+                                            .foregroundColor(.gray400)
+                                    }
+                                    
+                                    if deliveryMode == value && isAvailable {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.orangePrimary)
+                                            .font(.system(size: 18))
+                                    }
+                                }
+                                .padding(14)
+                                .background(deliveryMode == value ? Color.orangePrimary.opacity(0.06) : Color.white)
+                                .cornerRadius(14)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(deliveryMode == value ? Color.orangePrimary : Color.gray200, lineWidth: 1.5)
+                                )
+                                .shadow(color: Color.black.opacity(0.02), radius: 4, y: 2)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!isAvailable)
+                            .opacity(isAvailable ? 1.0 : 0.5)
+                        }
+                    }
+                }
+            }
+
+
+
+            if deliveryMode == "relay_to_relay" || deliveryMode == "home_to_relay" {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Relais d'arrivée (Retrait)").font(AppFont.medium(13)).foregroundColor(.gray900)
+                    let filtered = relayVM.relayPoints.filter { $0.commune?.lowercased() == recipientCommune.lowercased() }
+                    Menu {
+                        if filtered.isEmpty {
+                            ForEach(relayVM.relayPoints) { r in
+                                Button("\(r.name ?? "Relais") (\(r.commune ?? ""))") {
+                                    selectedDeliveryRelayId = r.id
                                 }
                             }
-                            .padding(12)
-                            .background(deliveryMode == value ? Color.orangePrimary.opacity(0.08) : Color.gray50)
-                            .cornerRadius(12)
-                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(
-                                deliveryMode == value ? Color.orangePrimary : Color.gray200, lineWidth: 1.5))
+                        } else {
+                            ForEach(filtered) { r in
+                                Button(r.name ?? "Relais") {
+                                    selectedDeliveryRelayId = r.id
+                                }
+                            }
                         }
-                        .buttonStyle(.plain)
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.down.circle.fill").foregroundColor(.purpleRelay).font(.system(size: 14))
+                            let selectedName = relayVM.relayPoints.first(where: { $0.id == selectedDeliveryRelayId })?.name
+                            Text(selectedName ?? "Choisir le relais d'arrivée")
+                                .font(AppFont.regular(14))
+                                .foregroundColor(selectedDeliveryRelayId == nil ? .gray400 : .gray900)
+                            Spacer()
+                            Image(systemName: "chevron.down").font(.system(size: 12)).foregroundColor(.gray500)
+                        }
+                        .padding(.horizontal, 14).padding(.vertical, 14)
+                        .background(Color.white)
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(selectedDeliveryRelayId == nil && canProceed ? Color.orangePrimary : Color.gray300, lineWidth: 1.5))
+                        .cornerRadius(12)
                     }
                 }
             }
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Mode de paiement").font(AppFont.medium(13)).foregroundColor(.gray900)
-                HStack(spacing: 8) {
-                    ForEach([("relay_cash", "Espèces au relais"), ("paystack", "En ligne")], id: \.0) { value, label in
+                VStack(spacing: 8) {
+                    ForEach([("relay_cash", "Paiement lors de la prise en charge"), ("paystack", "Paiement en ligne")], id: \.0) { value, label in
                         Button(action: { paymentMethod = value }) {
                             Text(label)
-                                .font(AppFont.semiBold(12))
+                                .font(AppFont.semiBold(13))
                                 .foregroundColor(paymentMethod == value ? .white : .gray700)
-                                .frame(maxWidth: .infinity).padding(.vertical, 10)
+                                .frame(maxWidth: .infinity).padding(.vertical, 12)
                                 .background(paymentMethod == value ? Color.orangePrimary : Color.gray100)
                                 .cornerRadius(10)
                         }
@@ -453,38 +633,143 @@ struct CreateShipmentView: View {
 
     // MARK: Step 3 - Confirmation
     private var confirmationStep: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 20) {
             stepHeader(title: "Confirmation", subtitle: "Vérifiez avant de créer l'envoi",
                        icon: "checkmark.circle.fill", color: .greenSuccess)
 
-            VStack(spacing: 12) {
-                summaryRow(icon: "arrow.up.circle.fill", color: .blueInfo,
-                           label: "Expéditeur", value: "\(senderName) · \(senderCommune)")
-                summaryRow(icon: "arrow.down.circle.fill", color: .orangePrimary,
-                           label: "Destinataire", value: "\(recipientName) · \(recipientCommune)")
-                summaryRow(icon: "shippingbox.fill", color: .purpleRelay,
-                           label: "Colis", value: "\(packageSizeLabel(packageSize)) · \(String(format: "%.1f", weight)) kg")
-                summaryRow(icon: "creditcard.fill", color: .greenSuccess,
-                           label: "Paiement", value: paymentMethod == "relay_cash" ? "Espèces au relais" : "En ligne")
-
-                if let price = pricingVM.result {
-                    Divider()
+            VStack(spacing: 0) {
+                // Section Expéditeur
+                VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("Tarif estimé").font(AppFont.bold(15)).foregroundColor(.gray900)
-                        Spacer()
-                        Text("\(Int(price.price)) FCFA").font(AppFont.extraBold(22)).foregroundColor(.orangePrimary)
+                        Image(systemName: "arrow.up.circle.fill").foregroundColor(.blueInfo)
+                        Text("Expéditeur").font(AppFont.bold(14)).foregroundColor(.gray900)
                     }
-                } else if pricingVM.isLoading {
+                    Text(senderName)
+                        .font(AppFont.medium(14)).foregroundColor(.gray700)
+                    Text("Tél: \(senderPhone)")
+                        .font(AppFont.regular(13)).foregroundColor(.gray500)
+                    Text("Commune: \(senderCommune), \(senderQuartier)")
+                        .font(AppFont.regular(13)).foregroundColor(.gray500)
+                    Text("Adresse: \(senderAddress)")
+                        .font(AppFont.regular(13)).foregroundColor(.gray500)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                
+                Divider()
+
+                // Section Destinataire
+                VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        ProgressView().tint(.orangePrimary)
-                        Text("Calcul du tarif…").font(AppFont.medium(14)).foregroundColor(.gray500)
+                        Image(systemName: "arrow.down.circle.fill").foregroundColor(.orangePrimary)
+                        Text("Destinataire").font(AppFont.bold(14)).foregroundColor(.gray900)
+                    }
+                    Text(recipientName)
+                        .font(AppFont.medium(14)).foregroundColor(.gray700)
+                    Text("Tél: \(recipientPhone)")
+                        .font(AppFont.regular(13)).foregroundColor(.gray500)
+                    Text("Commune: \(recipientCommune), \(recipientQuartier)")
+                        .font(AppFont.regular(13)).foregroundColor(.gray500)
+                    Text("Adresse: \(recipientAddress)")
+                        .font(AppFont.regular(13)).foregroundColor(.gray500)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Divider()
+
+                // Section Colis & Livraison
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "shippingbox.fill").foregroundColor(.purpleRelay)
+                        Text("Colis & Mode de livraison").font(AppFont.bold(14)).foregroundColor(.gray900)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Format:").font(AppFont.regular(13)).foregroundColor(.gray500)
+                            Spacer()
+                            Text(packageSizeLabel(packageSize)).font(AppFont.medium(13)).foregroundColor(.gray700)
+                        }
+                        HStack {
+                            Text("Poids:").font(AppFont.regular(13)).foregroundColor(.gray500)
+                            Spacer()
+                            Text(String(format: "%.1f kg", weight)).font(AppFont.medium(13)).foregroundColor(.gray700)
+                        }
+                        HStack {
+                            Text("Mode:").font(AppFont.regular(13)).foregroundColor(.gray500)
+                            Spacer()
+                            Text(deliveryModeLabel(deliveryMode)).font(AppFont.medium(13)).foregroundColor(.gray700)
+                        }
+                        
+                        if deliveryMode == "relay_to_relay" || deliveryMode == "relay_to_home" {
+                            HStack {
+                                Text("Dépôt:").font(AppFont.regular(13)).foregroundColor(.gray500)
+                                Spacer()
+                                Text("Libre (n'importe quel relais)").font(AppFont.medium(13)).foregroundColor(.gray700)
+                            }
+                        }
+                        if let deliveryId = selectedDeliveryRelayId,
+                           let r = relayVM.relayPoints.first(where: { $0.id == deliveryId }) {
+                            HStack {
+                                Text("Retrait:").font(AppFont.regular(13)).foregroundColor(.gray500)
+                                Spacer()
+                                Text(r.name ?? "Relais").font(AppFont.medium(13)).foregroundColor(.gray700)
+                            }
+                        }
                     }
                 }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Divider()
+
+                // Section Paiement & Tarif
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "creditcard.fill").foregroundColor(.greenSuccess)
+                        Text("Règlement").font(AppFont.bold(14)).foregroundColor(.gray900)
+                    }
+                    
+                    Text(paymentMethod == "relay_cash" ? "Paiement lors de la prise en charge" : "Paiement en ligne")
+                        .font(AppFont.medium(13)).foregroundColor(.gray700)
+                    
+                    if let pricingResult = pricingVM.result,
+                       let selectedModeObj = pricingResult.modes.first(where: { $0.key == deliveryMode }) {
+                        
+                        VStack(spacing: 4) {
+                            if selectedModeObj.discountPercent > 0 {
+                                HStack {
+                                    Text("Tarif standard").font(AppFont.regular(13)).foregroundColor(.gray500)
+                                    Spacer()
+                                    Text("\(Int(selectedModeObj.standardPriceFcfa)) FCFA").font(AppFont.regular(13)).foregroundColor(.gray500).strikethrough()
+                                }
+                                HStack {
+                                    Text("Remise (\(Int(selectedModeObj.discountPercent))%)").font(AppFont.regular(13)).foregroundColor(.greenSuccess)
+                                    Spacer()
+                                    Text("-\(Int(selectedModeObj.discountAmountFcfa)) FCFA").font(AppFont.regular(13)).foregroundColor(.greenSuccess)
+                                }
+                            }
+                            
+                            HStack {
+                                Text("Total à payer").font(AppFont.bold(15)).foregroundColor(.gray900)
+                                Spacer()
+                                Text("\(Int(selectedModeObj.finalPriceFcfa)) FCFA")
+                                    .font(AppFont.extraBold(20)).foregroundColor(.orangePrimary)
+                            }
+                            .padding(.top, 4)
+                        }
+                    } else if pricingVM.isLoading {
+                        ProgressView().tint(.orangePrimary).padding(.vertical, 4)
+                    }
+                }
+                .padding(14)
+                .background(Color.orangePrimary.opacity(0.03))
             }
-            .padding(16)
             .background(Color.white)
             .cornerRadius(16)
-            .shadow(color: .black.opacity(0.05), radius: 8)
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.gray200, lineWidth: 1.5))
+            .shadow(color: .black.opacity(0.02), radius: 6, y: 3)
 
             if let error = vm.error { ErrorBanner(message: error) }
         }
@@ -503,6 +788,8 @@ struct CreateShipmentView: View {
                             recipientName = contact.fullName
                             recipientPhone = contact.phone ?? ""
                             recipientCommune = contact.commune ?? ""
+                            recipientQuartier = contact.quartier ?? ""
+                            recipientAddress = contact.address ?? ""
                             showAddressBook = false
                         }) {
                             HStack(spacing: 12) {
@@ -593,31 +880,100 @@ struct CreateShipmentView: View {
     }
 
     private func packageSizeLabel(_ s: String) -> String {
-        switch s { case "small": return "Petit"; case "large": return "Grand"; default: return "Moyen" }
+        switch s { case "petit": return "Petit"; case "grand": return "Grand"; default: return "Moyen" }
+    }
+
+    private func deliveryModeLabel(_ m: String) -> String {
+        switch m {
+        case "relay_to_relay": return "Relais → Relais (Dépôt & Retrait en relais)"
+        case "home_to_relay": return "Domicile → Relais (Ramassage & Retrait en relais)"
+        case "relay_to_home": return "Relais → Domicile (Dépôt en relais & Livraison à domicile)"
+        case "home_to_home": return "Domicile → Domicile (Ramassage & Livraison à domicile)"
+        default: return m
+        }
     }
 
     private func submitShipment() {
+        let isHomePickup = (deliveryMode == "home_to_home" || deliveryMode == "home_to_relay")
+        let isHomeDelivery = (deliveryMode == "home_to_home" || deliveryMode == "relay_to_home")
+        
+        let senderParts = senderName.split(separator: " ", maxSplits: 1).map(String.init)
+        let senderFirst = senderParts.first ?? senderName
+        let senderLast = senderParts.count > 1 ? senderParts.last! : ""
+
+        let recipientParts = recipientName.split(separator: " ", maxSplits: 1).map(String.init)
+        let recipientFirst = recipientParts.first ?? recipientName
+        let recipientLast = recipientParts.count > 1 ? recipientParts.last! : ""
+
         let req = CreateShipmentRequest(
-            senderName: senderName,
+            senderFirstName: senderFirst,
+            senderLastName: senderLast,
+            senderEmail: user?.email,
             senderPhone: senderPhone,
             senderCommune: senderCommune,
-            recipientName: recipientName,
+            senderQuartier: senderQuartier,
+            senderAddress: senderAddress,
+            recipientFirstName: recipientFirst,
+            recipientLastName: recipientLast,
+            recipientEmail: nil,
             recipientPhone: recipientPhone,
             recipientCommune: recipientCommune,
-            packageSize: packageSize,
+            recipientQuartier: recipientQuartier,
+            recipientAddress: recipientAddress,
+            packageType: packageSize,
+            gridType: "colis",
             weight: weight,
-            deliveryMode: deliveryMode,
+            homeDelivery: isHomeDelivery,
+            pickupMethod: isHomePickup ? "home_pickup" : "relay_deposit",
+            originRelayId: nil,
+            destinationRelayId: isHomeDelivery ? nil : selectedDeliveryRelayId,
             paymentMethod: paymentMethod,
-            relayPickupId: selectedPickupRelayId,
-            relayDeliveryId: selectedDeliveryRelayId
+            paymentStatus: "pending"
         )
+        
+        if saveRecipientToAddressBook && user != nil {
+            let addrReq = CreateRecipientAddressRequest(
+                label: "\(recipientFirst) \(recipientLast)".trimmingCharacters(in: .whitespacesAndNewlines),
+                firstName: recipientFirst,
+                lastName: recipientLast,
+                email: nil,
+                phone: recipientPhone,
+                commune: recipientCommune,
+                quartier: recipientQuartier,
+                address: recipientAddress,
+                isDefault: false
+            )
+            Task {
+                try? await APIService.shared.createRecipientAddress(addrReq)
+            }
+        }
+
         Task {
             do {
-                _ = try await vm.createShipment(req)
-                dismiss()
+                let created = try await vm.createShipment(req)
+                self.createdShipment = created
             } catch {
                 // error is handled inside vm
             }
+        }
+    }
+
+    private func recalculatePrice() {
+        guard !senderCommune.isEmpty, !recipientCommune.isEmpty else { return }
+        pricingVM.senderCommune = senderCommune
+        pricingVM.recipientCommune = recipientCommune
+        pricingVM.packageSize = packageSize
+        pricingVM.weight = weight
+        Task {
+            await pricingVM.calculate()
+        }
+    }
+
+    private func updateDefaultRelaySelection() {
+        let needsDelivery = (deliveryMode == "relay_to_relay" || deliveryMode == "home_to_relay")
+        if needsDelivery && selectedDeliveryRelayId == nil {
+            let filtered = relayVM.relayPoints.filter { $0.commune?.lowercased() == recipientCommune.lowercased() }
+            selectedDeliveryRelayId = filtered.first?.id ?? relayVM.relayPoints.first?.id
         }
     }
 }

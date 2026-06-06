@@ -53,6 +53,11 @@ private sealed class CourierOverlay {
 fun CourierMainScreen(
     onLogout: () -> Unit,
     onPickupEntry: () -> Unit,
+    onOpenEditProfile: () -> Unit = {},
+    onOpenPaymentMethods: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    onOpenNotifications: () -> Unit = {},
+    onOpenDocuments: () -> Unit = {},
     authViewModel: AuthViewModel = hiltViewModel(),
     viewModel: TransporterViewModel = hiltViewModel(),
 ) {
@@ -248,9 +253,11 @@ fun CourierMainScreen(
                                 onPickupEntry = onPickupEntry,
                                 onRefresh = { viewModel.loadDashboard() },
                                 onLogout = onLogout,
-                                onSubScreenUnavailable = {
-                                    scope.launch { snackbar.showSnackbar("Disponible sur la version web livreur") }
-                                },
+                                onOpenEditProfile = onOpenEditProfile,
+                                onOpenPaymentMethods = onOpenPaymentMethods,
+                                onOpenSettings = onOpenSettings,
+                                onOpenNotifications = onOpenNotifications,
+                                onOpenDocuments = onOpenDocuments,
                             )
                         }
                         if (state.isLoading && tab == CourierTab.Home) {
@@ -571,7 +578,11 @@ private fun CourierProfileTab(
     onPickupEntry: () -> Unit,
     onRefresh: () -> Unit,
     onLogout: () -> Unit,
-    onSubScreenUnavailable: () -> Unit = {},
+    onOpenEditProfile: () -> Unit = {},
+    onOpenPaymentMethods: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    onOpenNotifications: () -> Unit = {},
+    onOpenDocuments: () -> Unit = {},
 ) {
     val openUri = rememberCourierProfileUriHandler()
     val items = ProfileVisibility.visibleCourierProfileItems()
@@ -643,13 +654,13 @@ private fun CourierProfileTab(
                 HorizontalDivider(color = Gray300)
             }
             if (ProfileVisibility.CourierProfileItem.PERSONAL_INFO in items) {
-                CourierProfileMenuRow(Icons.Default.Person, "Informations personnelles", onSubScreenUnavailable)
+                CourierProfileMenuRow(Icons.Default.Person, "Informations personnelles", onOpenEditProfile)
             }
             if (ProfileVisibility.CourierProfileItem.DOCUMENTS in items) {
-                CourierProfileMenuRow(Icons.Default.VerifiedUser, "Documents & vérifications", onSubScreenUnavailable)
+                CourierProfileMenuRow(Icons.Default.VerifiedUser, "Documents & vérifications", onOpenDocuments)
             }
             if (ProfileVisibility.CourierProfileItem.PAYMENTS in items) {
-                CourierProfileMenuRow(Icons.Default.CreditCard, "Moyens de paiement", onSubScreenUnavailable)
+                CourierProfileMenuRow(Icons.Default.CreditCard, "Moyens de paiement", onOpenPaymentMethods)
             }
             if (ProfileVisibility.CourierProfileItem.EARNINGS_DETAIL in items) {
                 CourierProfileMenuRow(Icons.Default.AccountBalanceWallet, "Détails des transactions", onGains)
@@ -661,7 +672,7 @@ private fun CourierProfileTab(
             CourierProfileMenuRow(Icons.Default.LocalShipping, "Mes courses", onCourses)
             CourierProfileMenuRow(Icons.Default.Edit, "Saisir un colis (ramassage)", onPickupEntry)
             if (ProfileVisibility.CourierProfileItem.NOTIFICATIONS in items) {
-                CourierProfileMenuRow(Icons.Default.Notifications, "Préférences notifications", onSubScreenUnavailable)
+                CourierProfileMenuRow(Icons.Default.Notifications, "Préférences notifications", onOpenNotifications)
             }
             if (ProfileVisibility.CourierProfileItem.SUPPORT in items) {
                 CourierProfileMenuRow(
@@ -671,7 +682,7 @@ private fun CourierProfileTab(
                 )
             }
             if (ProfileVisibility.CourierProfileItem.ACCOUNT_SETTINGS in items) {
-                CourierProfileMenuRow(Icons.Default.Settings, "Paramètres du compte", onSubScreenUnavailable)
+                CourierProfileMenuRow(Icons.Default.Settings, "Paramètres du compte", onOpenSettings)
             }
             if (ProfileVisibility.CourierProfileItem.REFRESH in items) {
                 CourierProfileMenuRow(Icons.Default.Refresh, "Actualiser le profil", onRefresh)

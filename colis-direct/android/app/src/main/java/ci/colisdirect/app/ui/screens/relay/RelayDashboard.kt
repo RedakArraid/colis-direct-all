@@ -22,7 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import ci.colisdirect.app.domain.RelayDisplayFormat
+import ci.colisdirect.app.ui.components.ShipmentCard
 import ci.colisdirect.app.ui.theme.*
 import ci.colisdirect.app.viewmodel.RelayViewModel
 
@@ -37,7 +37,7 @@ fun RelayDashboard(
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(Unit) { viewModel.loadDashboard() }
+    LaunchedEffect(Unit) { viewModel.loadRelayShipments() }
 
     LaunchedEffect(state.successMessage) {
         state.successMessage?.let {
@@ -52,7 +52,7 @@ fun RelayDashboard(
     ) { padding ->
         PullToRefreshBox(
             isRefreshing = state.isLoading,
-            onRefresh = { viewModel.loadDashboard() },
+            onRefresh = { viewModel.loadRelayShipments() },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
@@ -131,10 +131,9 @@ fun RelayDashboard(
                     ) {
                         RelayMetricCard(
                             label = "À recevoir",
-                            count = state.stats?.pendingPickups ?: state.pendingIntake.size,
+                            count = state.pendingIntake.size,
                             icon = Icons.Default.Inbox,
                             modifier = Modifier.weight(1f),
-                            subtitle = "Réseau",
                         )
                         RelayMetricCard(
                             label = "En relais",
@@ -143,23 +142,13 @@ fun RelayDashboard(
                             modifier = Modifier.weight(1f),
                         )
                         RelayMetricCard(
-                            label = "À livrer",
-                            count = state.stats?.pendingDeliveries ?: state.awaitingPickup.size,
-                            icon = Icons.Default.LocalShipping,
-                            highlight = (state.stats?.pendingDeliveries ?: state.awaitingPickup.size) > 0,
+                            label = "À remettre",
+                            count = state.awaitingPickup.size,
+                            icon = Icons.Default.PersonPin,
+                            highlight = state.awaitingPickup.isNotEmpty(),
                             modifier = Modifier.weight(1f),
                         )
                     }
-                }
-
-                item {
-                    Text(
-                        "${state.stats?.completedToday ?: 0} traités aujourd'hui · " +
-                            RelayDisplayFormat.formatFcfa(state.stats?.monthlyRevenue ?: 0.0) + " ce mois",
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                        fontSize = 12.sp,
-                        color = Gray600,
-                    )
                 }
 
                 // ── Pending intake ───────────────────────────────────────────
@@ -172,11 +161,9 @@ fun RelayDashboard(
                         )
                     }
                     items(state.pendingIntake, key = { it.id }) { shipment ->
-                        RelayRichShipmentCard(
-                            shipment = shipment,
-                            onClick = {},
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                        )
+                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                            ShipmentCard(shipment = shipment, onClick = { })
+                        }
                     }
                 }
 
@@ -213,11 +200,9 @@ fun RelayDashboard(
                         )
                     }
                     items(state.awaitingPickup, key = { "p_${it.id}" }) { shipment ->
-                        RelayRichShipmentCard(
-                            shipment = shipment,
-                            onClick = {},
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                        )
+                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                            ShipmentCard(shipment = shipment, onClick = { })
+                        }
                     }
                 }
 
@@ -270,6 +255,89 @@ fun RelayDashboard(
                     }
                 }
             }
+        }
+    }
+}
+
+// ── Relay metric card ────────────────────────────────────────────────────────
+@Composable
+private fun RelayMetricCard(
+    label: String,
+    count: Int,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    highlight: Boolean = false,
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (highlight) OrangeLight else Color.White,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(icon, null, modifier = Modifier.size(20.dp), tint = OrangePrimary)
+            Text(
+                count.toString(),
+                fontFamily = InterFontFamily,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 22.sp,
+                color = if (highlight) OrangePrimary else Gray900,
+            )
+            Text(
+                label,
+                fontFamily = InterFontFamily,
+                fontWeight = FontWeight.Medium,
+                fontSize = 10.sp,
+                color = Gray500,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+// ── Section header ───────────────────────────────────────────────────────────
+@Composable
+private fun RelaySectionHeader(title: String, count: Int, icon: ImageVector) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, null, tint = OrangePrimary, modifier = Modifier.size(17.dp))
+            Text(
+                title,
+                fontFamily = InterFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = Gray900,
+            )
+        }
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(OrangeLight)
+                .padding(horizontal = 8.dp, vertical = 3.dp),
+        ) {
+            Text(
+                count.toString(),
+                fontFamily = InterFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                color = OrangePrimary,
+            )
         }
     }
 }

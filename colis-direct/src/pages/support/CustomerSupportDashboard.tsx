@@ -2859,7 +2859,8 @@ const CustomerSupportDashboard = ({ onNavigate }: { onNavigate: (page: string) =
       try {
         const url = new URL(`${API_URL}/support/events`);
         url.searchParams.set('token', token!);
-        es = new EventSource(url.toString(), { withCredentials: true });
+        // Auth via ?token= — pas de cookies ; withCredentials provoque un échec CORS.
+        es = new EventSource(url.toString());
         
         es.onopen = () => {
           console.log('[SSE] Connexion établie');

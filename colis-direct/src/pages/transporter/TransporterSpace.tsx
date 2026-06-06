@@ -69,6 +69,33 @@ const getCoords = (communeName?: string): [number, number] => {
 const fromOf = (r: any) => r?.sender_commune || r?.origin_relay_commune || r?.relay_commune || '—';
 const toOf = (r: any) => r?.recipient_commune || r?.destination_relay_commune || '—';
 
+const isHomePickup = (r: any) => r?.pickup_method === 'home_pickup';
+
+const pickupLabelOf = (r: any) => {
+  if (isHomePickup(r)) {
+    const parts = [r?.sender_address, r?.sender_quartier, r?.sender_commune].filter(Boolean);
+    return parts.length ? parts.join(', ') : (r?.sender_commune || '—');
+  }
+  return r?.origin_relay_name || r?.origin_relay_address || fromOf(r);
+};
+
+const destLabelOf = (r: any) => {
+  if (r?.home_delivery) {
+    const parts = [r?.recipient_address, r?.recipient_quartier, r?.recipient_commune].filter(Boolean);
+    return parts.length ? parts.join(', ') : (r?.recipient_commune || '—');
+  }
+  return r?.destination_relay_name || r?.destination_relay_address || toOf(r);
+};
+
+const pickupCoordsOf = (r: any): [number, number] => {
+  if (r?.sender_latitude != null && r?.sender_longitude != null) {
+    return [Number(r.sender_latitude), Number(r.sender_longitude)];
+  }
+  return getCoords(fromOf(r));
+};
+
+const destCoordsOf = (r: any): [number, number] => getCoords(toOf(r));
+
 // ── Inject Custom Global Styles ──
 const injectStyles = () => {
   if (typeof document === 'undefined') return;
@@ -333,9 +360,21 @@ function TopBar({ title, onBack, light, action }: any) {
 }
 
 // ── Interactive Premium Vector Map ──
-function DynamicVectorMap({ fromCommune, toCommune, MapComponents }: { fromCommune: string; toCommune: string; MapComponents: any }) {
-  const p1 = getCoords(fromCommune);
-  const p2 = getCoords(toCommune);
+function DynamicVectorMap({
+  fromCommune,
+  toCommune,
+  MapComponents,
+  fromPosition,
+  toPosition,
+}: {
+  fromCommune: string;
+  toCommune: string;
+  MapComponents: any;
+  fromPosition?: [number, number] | null;
+  toPosition?: [number, number] | null;
+}) {
+  const p1 = fromPosition ?? getCoords(fromCommune);
+  const p2 = toPosition ?? getCoords(toCommune);
   const center: [number, number] = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
 
   if (!MapComponents) {
@@ -1165,9 +1204,14 @@ export default function TransporterSpace() {
                   <div style={{ display: 'flex', gap: 12 }}>
                     <RouteDots tall />
                     <div>
-                      <div style={{ fontWeight: 800, fontSize: 15, color: CD.ink }}>{fromOf(r)}</div>
+                      {isHomePickup(r) && (
+                        <span style={{ display: 'inline-block', marginBottom: 6, fontSize: 10, fontWeight: 800, color: CD.orange, background: CD.orangeSoft, padding: '3px 8px', borderRadius: 999 }}>
+                          Ramassage à domicile
+                        </span>
+                      )}
+                      <div style={{ fontWeight: 800, fontSize: 15, color: CD.ink }}>{pickupLabelOf(r)}</div>
                       <div style={{ fontSize: 11, color: CD.muted, margin: '6px 0', fontWeight: 600 }}>{r.package_type || 'Colis'} · {r.weight || '?'} kg</div>
-                      <div style={{ fontWeight: 800, fontSize: 15, color: CD.ink }}>{toOf(r)}</div>
+                      <div style={{ fontWeight: 800, fontSize: 15, color: CD.ink }}>{destLabelOf(r)}</div>
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
@@ -1177,7 +1221,7 @@ export default function TransporterSpace() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 4, paddingTop: 14, borderTop: `1px solid ${CD.line}` }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: CD.muted, fontWeight: 600 }}>
-                    <MapPin size={14} color={CD.orange} /> {toOf(r)}
+                    <MapPin size={14} color={CD.orange} /> {isHomePickup(r) ? pickupLabelOf(r) : toOf(r)}
                   </span>
                   <button
                     onClick={() => { setSelected(r); setScreen('detail'); }}
@@ -1211,7 +1255,13 @@ export default function TransporterSpace() {
     return (
       <Shell>
         <div style={{ position: 'relative', height: 260 }}>
-          <DynamicVectorMap fromCommune={fromOf(r)} toCommune={toOf(r)} MapComponents={MapComponents} />
+          <DynamicVectorMap
+            fromCommune={fromOf(r)}
+            toCommune={toOf(r)}
+            fromPosition={isHomePickup(r) ? pickupCoordsOf(r) : null}
+            toPosition={r.home_delivery ? destCoordsOf(r) : null}
+            MapComponents={MapComponents}
+          />
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
             <TopBar title="" light onBack={() => setScreen('available')} action={<span />} />
           </div>
@@ -1231,14 +1281,25 @@ export default function TransporterSpace() {
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ paddingBottom: 20 }}>
-                <div style={{ fontSize: 10, color: CD.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>ENLÈVEMENT</div>
-                <div style={{ fontWeight: 800, fontSize: 16, color: CD.ink, marginTop: 2 }}>{r.origin_relay_name || r.sender_commune || '—'}</div>
-                <div style={{ fontSize: 12, color: CD.muted, fontWeight: 500, marginTop: 2 }}>{`${r.sender_first_name || ''} ${r.sender_last_name || ''}`.trim()} · {r.sender_phone || ''}</div>
+                <div style={{ fontSize: 10, color: CD.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  {isHomePickup(r) ? 'RAMASSAGE DOMICILE' : 'ENLÈVEMENT'}
+                </div>
+                <div style={{ fontWeight: 800, fontSize: 16, color: CD.ink, marginTop: 2 }}>{pickupLabelOf(r)}</div>
+                <div style={{ fontSize: 12, color: CD.muted, fontWeight: 500, marginTop: 2 }}>
+                  {`${r.sender_first_name || ''} ${r.sender_last_name || ''}`.trim()}
+                  {r.sender_phone ? ` · ${r.sender_phone}` : ''}
+                </div>
+                {isHomePickup(r) && r.sender_latitude != null && (
+                  <div style={{ fontSize: 11, color: CD.green, fontWeight: 600, marginTop: 4 }}>📍 Position GPS client disponible</div>
+                )}
               </div>
               <div>
                 <div style={{ fontSize: 10, color: CD.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>DESTINATION</div>
-                <div style={{ fontWeight: 800, fontSize: 16, color: CD.ink, marginTop: 2 }}>{r.destination_relay_name || r.recipient_commune || '—'}</div>
-                <div style={{ fontSize: 12, color: CD.muted, fontWeight: 500, marginTop: 2 }}>{`${r.recipient_first_name || ''} ${r.recipient_last_name || ''}`.trim()} · {r.recipient_phone || ''}</div>
+                <div style={{ fontWeight: 800, fontSize: 16, color: CD.ink, marginTop: 2 }}>{destLabelOf(r)}</div>
+                <div style={{ fontSize: 12, color: CD.muted, fontWeight: 500, marginTop: 2 }}>
+                  {`${r.recipient_first_name || ''} ${r.recipient_last_name || ''}`.trim()}
+                  {r.recipient_phone ? ` · ${r.recipient_phone}` : ''}
+                </div>
               </div>
             </div>
           </div>

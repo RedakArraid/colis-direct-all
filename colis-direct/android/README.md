@@ -23,7 +23,25 @@ Les scripts exportent `adb` via `scripts/_android-env.sh` (`~/Library/Android/sd
 ## Android Studio
 
 Ouvrir **uniquement** ce dossier : `colis-direct/android`  
-Run : module **app**, variante **`devDebug`**.
+Run : module **app**, variante **`devDebug`** (obligatoire — il n’y a pas de variant `debug` seul).
+
+**Erreur IDE** `apk_ide_redirect_file/debug/.../redirect.txt` : lancer `./scripts/fix-android-studio.sh` (build + compat redirect + réinit `.idea`), puis Sync Gradle. Variant par défaut : **devDebug** (`dev { isDefault = true }`).
+
+**Gradle :** wrapper **8.13** (`gradle/wrapper/gradle-wrapper.properties`) — requis par Android Gradle Plugin **8.13.2**.  
+Dans *Settings → Build → Gradle*, utiliser **Gradle wrapper** (pas une installation locale 8.7). Puis *Sync Project with Gradle Files* ou :
+
+```bash
+./gradlew --version   # doit afficher Gradle 8.13
+```
+
+**Java (JDK 17+)** : si le terminal affiche *Unable to locate a Java Runtime*, le script `gradlew` utilise automatiquement le JDK d’**Android Studio** (`…/Android Studio.app/Contents/jbr`). Sinon, dans `~/.zshrc` :
+
+```bash
+export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+export PATH="$JAVA_HOME/bin:$PATH"
+```
+
+Ou ajoute `java.home=…` dans `local.properties` (voir `local.properties.example`).
 
 ## Packages
 

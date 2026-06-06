@@ -72,7 +72,7 @@ fun TransporterDashboard(
                     onClick = onPickupScan,
                     containerColor = MaterialTheme.colorScheme.primary,
                 ) {
-                    Icon(Icons.Default.Edit, "Saisir un colis")
+                    Icon(Icons.Default.QrCodeScanner, "Scanner un colis")
                 }
             }
         },
@@ -101,7 +101,7 @@ fun TransporterDashboard(
                     )
                     Text("Aucun colis en cours", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Saisissez le n° de suivi pour collecter un colis",
+                        "Utilisez le scanner pour collecter un colis",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }

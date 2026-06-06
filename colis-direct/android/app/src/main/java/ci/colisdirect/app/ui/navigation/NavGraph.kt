@@ -4,7 +4,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import android.net.Uri
 import androidx.activity.ComponentActivity
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
@@ -29,6 +31,9 @@ import ci.colisdirect.app.ui.screens.client.PayCardScreen
 import ci.colisdirect.app.ui.screens.client.PayMobileMoneyScreen
 import ci.colisdirect.app.ui.screens.client.PaySuccessScreen
 import ci.colisdirect.app.ui.screens.client.PaymentMethodScreen
+import ci.colisdirect.app.ui.screens.client.ProfileEditScreen
+import ci.colisdirect.app.ui.screens.client.ProfilePaymentMethodsScreen
+import ci.colisdirect.app.ui.screens.client.ProfileSettingsScreen
 import ci.colisdirect.app.ui.screens.client.ShipmentDetailScreen
 import ci.colisdirect.app.data.api.model.RecipientAddressDto
 import ci.colisdirect.app.ui.screens.admin.AdminMainScreen
@@ -39,7 +44,6 @@ import ci.colisdirect.app.ui.screens.mobile.AddressBookScreen
 import ci.colisdirect.app.ui.screens.mobile.NotificationsScreen
 import ci.colisdirect.app.ui.screens.mobile.PartnerScreen
 import ci.colisdirect.app.ui.screens.mobile.PaymentHistoryScreen
-import ci.colisdirect.app.ui.screens.mobile.PricingScreen
 import ci.colisdirect.app.ui.screens.relay.DeliveryConfirmScreen
 import ci.colisdirect.app.ui.screens.relay.RelayIntakeScreen
 import ci.colisdirect.app.ui.screens.transporter.HomePickupScreen
@@ -63,10 +67,12 @@ object Routes {
     const val ADMIN_MAIN = "admin_main"
     const val SUPPORT_MAIN = "support_main"
     const val NOTIFICATIONS = "notifications"
-    const val PRICING = "pricing"
     const val PARTNER = "partner?partnerType={partnerType}"
     const val ADDRESS_BOOK = "address_book?forSelection={forSelection}"
     const val PAYMENT_HISTORY = "payment_history"
+    const val PROFILE_EDIT = "profile_edit"
+    const val PROFILE_PAYMENT_METHODS = "profile_payment_methods"
+    const val PROFILE_SETTINGS = "profile_settings"
 
     fun partnerRoute(partnerType: String? = null): String =
         if (partnerType.isNullOrBlank()) "partner?partnerType=" else "partner?partnerType=$partnerType"
@@ -156,6 +162,7 @@ fun AppNavGraph() {
         }
 
         composable(Routes.COURIER_MAIN) {
+            val context = LocalContext.current
             CourierMainScreen(
                 onLogout = {
                     authViewModel.signOut()
@@ -164,6 +171,14 @@ fun AppNavGraph() {
                     }
                 },
                 onPickupEntry = { navController.navigate(Routes.PICKUP_SCAN) },
+                onOpenEditProfile = { navController.navigate(Routes.PROFILE_EDIT) },
+                onOpenPaymentMethods = { navController.navigate(Routes.PROFILE_PAYMENT_METHODS) },
+                onOpenSettings = { navController.navigate(Routes.PROFILE_SETTINGS) },
+                onOpenNotifications = { navController.navigate(Routes.NOTIFICATIONS) },
+                onOpenDocuments = {
+                    CustomTabsIntent.Builder().build()
+                        .launchUrl(context, Uri.parse("https://colisdirect.com/devenir-transporteur"))
+                },
             )
         }
 
@@ -214,20 +229,18 @@ fun AppNavGraph() {
                 onDeliveryConfirm = { navController.navigate(Routes.DELIVERY_CONFIRM) },
                 onPickupScan = { navController.navigate(Routes.PICKUP_SCAN) },
                 onHomePickup = { navController.navigate(Routes.HOME_PICKUP) },
-                onOpenPricing = { navController.navigate(Routes.PRICING) },
                 onOpenPartner = { type -> navController.navigate(Routes.partnerRoute(type)) },
                 onOpenAddressBook = { navController.navigate(Routes.addressBookRoute(forSelection = false)) },
                 onOpenPaymentHistory = { navController.navigate(Routes.PAYMENT_HISTORY) },
+                onOpenEditProfile = { navController.navigate(Routes.PROFILE_EDIT) },
+                onOpenPaymentMethods = { navController.navigate(Routes.PROFILE_PAYMENT_METHODS) },
+                onOpenSettings = { navController.navigate(Routes.PROFILE_SETTINGS) },
                 onPayShipmentOnline = { tracking, amount, routeLabel ->
                     navController.navigate(Routes.paymentMethodRoute(tracking, amount, routeLabel))
                 },
                 initialTrackingPrefill = trackingPrefillFromNotif,
                 onTrackingPrefillConsumed = { trackingPrefillFromNotif = null },
             )
-        }
-
-        composable(Routes.PRICING) {
-            PricingScreen(onBack = { navController.popBackStack() })
         }
 
         composable(
@@ -282,6 +295,18 @@ fun AppNavGraph() {
 
         composable(Routes.PAYMENT_HISTORY) {
             PaymentHistoryScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.PROFILE_EDIT) {
+            ProfileEditScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.PROFILE_PAYMENT_METHODS) {
+            ProfilePaymentMethodsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.PROFILE_SETTINGS) {
+            ProfileSettingsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Routes.NOTIFICATIONS) {

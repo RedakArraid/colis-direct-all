@@ -218,7 +218,7 @@ struct DeliveryConfirmView: View {
     @ObservedObject var vm: RelayViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var trackingInput = ""
-    @State private var recipientPhone = ""
+    @State private var pickupCode = ""
 
     var body: some View {
         NavigationStack {
@@ -232,7 +232,7 @@ struct DeliveryConfirmView: View {
                     .font(AppFont.extraBold(22))
                     .foregroundColor(.gray900)
 
-                Text("Saisissez le numéro de suivi et le téléphone du destinataire pour confirmer la remise du colis.")
+                Text("Saisissez le numéro de suivi et le code de retrait pour valider la remise du colis.")
                     .font(AppFont.regular(14))
                     .foregroundColor(.gray500)
                     .multilineTextAlignment(.center)
@@ -240,11 +240,11 @@ struct DeliveryConfirmView: View {
 
                 VStack(spacing: 16) {
                     CdTextField(label: "Numéro de suivi", text: $trackingInput, placeholder: "CD12345678", leadingIcon: "barcode")
-                    CdTextField(label: "Téléphone destinataire", text: $recipientPhone, placeholder: "05 XX XX XX XX", leadingIcon: "phone.fill", keyboardType: .phonePad)
+                    CdTextField(label: "Code de retrait", text: $pickupCode, placeholder: "Ex: 123456", leadingIcon: "lock.fill", keyboardType: .numberPad)
 
                     Button(action: {
                         Task {
-                            await vm.completeDelivery(trackingNumber: trackingInput, recipientPhone: recipientPhone)
+                            await vm.completeDelivery(trackingNumber: trackingInput, pickupCode: pickupCode)
                         }
                     }) {
                         HStack(spacing: 8) {
@@ -259,10 +259,10 @@ struct DeliveryConfirmView: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
-                        .background((trackingInput.isEmpty || recipientPhone.isEmpty) ? Color.greenSuccess.opacity(0.5) : Color.greenSuccess)
+                        .background((trackingInput.isEmpty || pickupCode.isEmpty) ? Color.greenSuccess.opacity(0.5) : Color.greenSuccess)
                         .cornerRadius(12)
                     }
-                    .disabled(trackingInput.isEmpty || recipientPhone.isEmpty || vm.isLoading)
+                    .disabled(trackingInput.isEmpty || pickupCode.isEmpty || vm.isLoading)
                 }
                 .padding(.horizontal, 20)
 

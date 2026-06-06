@@ -129,12 +129,17 @@ app.get('/health', async (_req, res) => {
 });
 
 // ─── Rate Limiters ────────────────────────────────────────────────────────────
+const e2eRateLimitBypassKey = process.env.E2E_RATE_LIMIT_BYPASS_KEY;
+const skipE2ERateLimit = (req: express.Request) =>
+  !!e2eRateLimitBypassKey && req.header('x-e2e-bypass-key') === e2eRateLimitBypassKey;
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Trop de tentatives. Réessayez dans 15 minutes.' },
+  skip: skipE2ERateLimit,
 });
 
 const createLimiter = rateLimit({

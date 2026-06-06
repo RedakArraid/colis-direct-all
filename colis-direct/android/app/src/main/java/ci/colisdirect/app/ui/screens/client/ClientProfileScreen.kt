@@ -12,7 +12,9 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Settings
 import ci.colisdirect.app.domain.ProfileVisibility
 import ci.colisdirect.app.domain.UserRoles
 import ci.colisdirect.app.ui.components.ProfileIconBlue
@@ -49,10 +51,12 @@ import ci.colisdirect.app.viewmodel.AuthViewModel
 @Composable
 fun ClientProfileScreen(
     onLogoutClick: () -> Unit,
-    onOpenPricing: () -> Unit = {},
     onOpenPartner: () -> Unit = {},
     onOpenAddressBook: () -> Unit = {},
     onOpenPaymentHistory: () -> Unit = {},
+    onOpenEditProfile: () -> Unit = {},
+    onOpenPaymentMethods: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
     onIntakeScan: (() -> Unit)? = null,
     onDeliveryConfirm: (() -> Unit)? = null,
     onPickupScan: (() -> Unit)? = null,
@@ -267,6 +271,15 @@ fun ClientProfileScreen(
                         modifier = Modifier.padding(8.dp),
                         verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
+                        if (ProfileVisibility.ClientProfileItem.EDIT_PROFILE in clientMenu) {
+                            ProfileMenuOption(
+                                icon = Icons.Default.Edit,
+                                label = "Informations personnelles",
+                                iconBackground = ProfileIconBlueBg,
+                                iconTint = ProfileIconBlue,
+                                onClick = onOpenEditProfile,
+                            )
+                        }
                         if (ProfileVisibility.ClientProfileItem.ADDRESS_BOOK in clientMenu) {
                             ProfileMenuOption(
                                 icon = ColisDirectIcons.MapPin,
@@ -274,6 +287,15 @@ fun ClientProfileScreen(
                                 iconBackground = ProfileIconGreenBg,
                                 iconTint = ProfileIconGreen,
                                 onClick = onOpenAddressBook,
+                            )
+                        }
+                        if (ProfileVisibility.ClientProfileItem.PAYMENT_METHODS in clientMenu) {
+                            ProfileMenuOption(
+                                icon = Icons.Default.CreditCard,
+                                label = "Moyens de paiement",
+                                iconBackground = ProfileIconYellowBg,
+                                iconTint = ProfileIconYellow,
+                                onClick = onOpenPaymentMethods,
                             )
                         }
                         if (ProfileVisibility.ClientProfileItem.PAYMENT_HISTORY in clientMenu) {
@@ -285,13 +307,13 @@ fun ClientProfileScreen(
                                 onClick = onOpenPaymentHistory,
                             )
                         }
-                        if (ProfileVisibility.ClientProfileItem.PRICING in clientMenu) {
+                        if (ProfileVisibility.ClientProfileItem.SETTINGS in clientMenu) {
                             ProfileMenuOption(
-                                icon = ColisDirectIcons.Receipt,
-                                label = "Tarifs",
-                                iconBackground = ProfileIconOrangeBg,
-                                iconTint = ProfileIconOrange,
-                                onClick = onOpenPricing,
+                                icon = Icons.Default.Settings,
+                                label = "Paramètres",
+                                iconBackground = ProfileIconIndigoBg,
+                                iconTint = ProfileIconIndigo,
+                                onClick = onOpenSettings,
                             )
                         }
                         if (ProfileVisibility.ClientProfileItem.PARTNER in clientMenu) {
